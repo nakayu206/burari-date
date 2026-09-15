@@ -8,9 +8,10 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/station.dart';
 import '../../providers/station_providers.dart';
 
-/// Figma実測値: このモーダル内の全要素間の縦ギャップは一律14px
-/// (S-02の16px/6pxの2段階リズムとは異なる、この画面固有の値)。
-const _kGap = 14.0;
+/// このモーダル内の全要素間の縦ギャップ。Figmaのノード座標では実測14pxだったが、
+/// 他画面と同じ16pxリズムに統一し、デザイントークンからの逸脱をなくした
+/// (docs/デザイントークン.md参照)。
+const _kGap = AppSpacing.lg;
 
 /// S-02b 出発駅検索(サジェスト)。S-02 の出発駅欄タップでモーダル表示する。
 Future<Station?> showStationSearchSheet(BuildContext context) {
