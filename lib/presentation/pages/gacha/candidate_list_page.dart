@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/gacha_result.dart';
 import '../../providers/candidate_providers.dart';
@@ -43,6 +45,14 @@ class _CandidateListPageState extends ConsumerState<CandidateListPage>
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
+          labelStyle: const TextStyle(
+            fontSize: AppFontSizes.bodyMedium,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: AppFontSizes.bodyMedium,
+            fontWeight: FontWeight.normal,
+          ),
           tabs: const [
             Tab(text: 'グルメ'),
             Tab(text: '観光'),
@@ -82,9 +92,9 @@ class _CandidateListTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('候補の取得に失敗しました: $error')),
       data: (candidates) => ListView.separated(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         itemCount: candidates.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.lg),
         itemBuilder: (context, index) {
           final candidate = candidates[index];
           return InkWell(
@@ -95,7 +105,7 @@ class _CandidateListTab extends ConsumerWidget {
               ),
             ),
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(8),
@@ -118,7 +128,7 @@ class _CandidateListTab extends ConsumerWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,24 +137,24 @@ class _CandidateListTab extends ConsumerWidget {
                           candidate.name,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 14,
+                            fontSize: AppFontSizes.bodyLarge,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'AI: ${candidate.catchCopy}',
                           style: const TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 11,
+                            fontSize: AppFontSizes.labelSmall,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           '駅から徒歩${candidate.walkMinutes}分',
                           style: const TextStyle(
                             color: AppColors.secondary,
-                            fontSize: 10,
+                            fontSize: AppFontSizes.caption,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
