@@ -6,6 +6,13 @@ import '../../domain/entities/station.dart';
 import '../../domain/usecases/run_gacha.dart';
 import 'station_providers.dart';
 
+/// スライダー/ステッパーで選択できる駅数範囲の実用上限。
+///
+/// 路線の実際の長さがこれより長くても、UIではここまでしか選ばせない
+/// (長大な路線でスライダーの目盛りが細かくなりすぎて操作しづらくなるのを防ぐ。
+/// Issue #38)。
+const kMaxSelectableStops = 30;
+
 /// S-02 出発駅・路線・駅数範囲選択画面の入力状態。
 class GachaFormState {
   const GachaFormState({
@@ -23,6 +30,14 @@ class GachaFormState {
   final GachaDirection direction;
 
   bool get canStartGacha => departure != null && line != null;
+
+  /// 現在選択中の路線に対する駅数範囲の実用上限(kMaxSelectableStops参照)。
+  int get maxSelectableStops {
+    final line = this.line;
+    if (line == null) return kMaxSelectableStops;
+    final lineMax = line.stations.length - 1;
+    return lineMax < kMaxSelectableStops ? lineMax : kMaxSelectableStops;
+  }
 
   GachaFormState copyWith({
     Station? departure,
@@ -49,7 +64,19 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
     final line = ref
         .read(stationRepositoryProvider)
         .findLineForStation(station);
-    state = state.copyWith(departure: station, line: line);
+    final maxSelectable = line == null
+        ? kMaxSelectableStops
+        : (line.stations.length - 1).clamp(0, kMaxSelectableStops);
+    final newMax = state.maxStops > maxSelectable
+        ? maxSelectable
+        : state.maxStops;
+    final newMin = state.minStops > newMax ? newMax : state.minStops;
+    state = state.copyWith(
+      departure: station,
+      line: line,
+      minStops: newMin,
+      maxStops: newMax,
+    );
   }
 
   void updateStopsRange(int minStops, int maxStops) {
@@ -58,6 +85,36 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
 
   void updateDirection(GachaDirection direction) {
     state = state.copyWith(direction: direction);
+  }
+
+  /// 最小駅数を1駅減らす(1駅未満にはしない)。
+  void decrementMinStops() {
+    final next = (state.minStops - 1).clamp(1, state.maxStops);
+    state = state.copyWith(minStops: next);
+  }
+
+  /// 最小駅数を1駅増やす(最大駅数は超えない)。
+  void incrementMinStops() {
+    final next = (state.minStops + 1).clamp(1, state.maxStops);
+    state = state.copyWith(minStops: next);
+  }
+
+  /// 最大駅数を1駅減らす(最小駅数は下回らない)。
+  void decrementMaxStops() {
+    final next = (state.maxStops - 1).clamp(
+      state.minStops,
+      state.maxSelectableStops,
+    );
+    state = state.copyWith(maxStops: next);
+  }
+
+  /// 最大駅数を1駅増やす(maxSelectableStopsは超えない)。
+  void incrementMaxStops() {
+    final next = (state.maxStops + 1).clamp(
+      state.minStops,
+      state.maxSelectableStops,
+    );
+    state = state.copyWith(maxStops: next);
   }
 
   /// 現在の入力状態でガチャを実行する。[canStartGacha]がtrueの場合のみ呼び出すこと。
