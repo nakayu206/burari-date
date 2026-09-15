@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
 
 /// S-06 候補詳細画面
@@ -15,10 +17,13 @@ class CandidateDetailPage extends StatelessWidget {
       appBar: AppBar(title: const Text('候補詳細')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.md,
+          ),
           children: [
             Container(
-              height: 160,
+              height: 130,
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(8),
@@ -32,34 +37,34 @@ class CandidateDetailPage extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               candidate.name,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 16,
+                fontSize: AppFontSizes.titleMedium,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               'AI: ${candidate.catchCopy}',
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 11,
+                fontSize: AppFontSizes.labelSmall,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               candidate.reason,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 13,
+                fontSize: AppFontSizes.bodyMedium,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Container(
-              height: 120,
+              height: 100,
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(8),
@@ -72,15 +77,15 @@ class CandidateDetailPage extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               '住所: ${candidate.address ?? '(外部API連携後に表示)'}',
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 11,
+                fontSize: AppFontSizes.labelSmall,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: AppSpacing.lg),
             ElevatedButton(
               onPressed: () {
                 ScaffoldMessenger.of(
