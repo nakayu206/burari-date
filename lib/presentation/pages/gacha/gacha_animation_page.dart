@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/gacha_result.dart';
 import 'arrival_result_page.dart';
 
@@ -94,23 +96,23 @@ class _GachaAnimationPageState extends State<GachaAnimationPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _FlipPanel(text: _topPanel),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.x2l),
               _FlipPanel(text: _phase == _Phase.stops ? '' : _bottomPanel),
-              const SizedBox(height: 40),
+              const SizedBox(height: AppSpacing.x4l),
               Text(
                 _caption,
                 style: const TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 13,
+                  fontSize: AppFontSizes.bodyMedium,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: AppSpacing.x4l),
               if (!_finished)
                 const Text(
                   '(タップでスキップ)',
                   style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 10,
+                    fontSize: AppFontSizes.caption,
                   ),
                 ),
             ],
@@ -133,7 +135,10 @@ class _FlipPanel extends StatelessWidget {
       duration: const Duration(milliseconds: 80),
       child: Container(
         key: ValueKey(text),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.x2l,
+          vertical: AppSpacing.md,
+        ),
         decoration: BoxDecoration(
           color: AppColors.textPrimary,
           borderRadius: BorderRadius.circular(6),
@@ -142,7 +147,7 @@ class _FlipPanel extends StatelessWidget {
           text,
           style: const TextStyle(
             color: AppColors.background,
-            fontSize: 24,
+            fontSize: AppFontSizes.headlineLarge,
             fontWeight: FontWeight.bold,
           ),
         ),
