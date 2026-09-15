@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/gacha_result.dart';
 import '../../providers/gacha_form_provider.dart';
 import 'candidate_list_page.dart';
@@ -26,27 +28,28 @@ class ArrivalResultPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('到着駅決定')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Column(
             children: [
-              const Spacer(flex: 2),
+              // Figma実測比(rect 160px : 140px ≒ 8:7)を再現するフレックス比。
+              const Spacer(flex: 8),
               Text(
                 '出発駅から${result.stopsCount}駅隣',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 12,
+                  fontSize: AppFontSizes.bodySmall,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.lg),
               Text(
                 result.arrivalStation.name,
                 style: const TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 34,
+                  fontSize: AppFontSizes.displayLarge,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const Spacer(flex: 3),
+              const Spacer(flex: 7),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -55,7 +58,7 @@ class ArrivalResultPage extends ConsumerWidget {
                 ),
                 child: const Text('候補を見る'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.lg),
               OutlinedButton(
                 onPressed: () => _reroll(context, ref),
                 child: const Text('もう一度ガチャ'),

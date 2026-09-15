@@ -18,6 +18,9 @@ class AppFontSizes {
   /// 14px。本文標準・入力文字。
   static const bodyLarge = 14.0;
 
+  /// 12px。到着駅決定画面の「出発駅からN駅隣」等。
+  static const bodySmall = 12.0;
+
   /// 13px。本文小・サブキャプション。
   static const bodyMedium = 13.0;
 
