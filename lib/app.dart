@@ -20,7 +20,7 @@ class BurariDateApp extends ConsumerWidget {
   }
 
   ThemeData _buildTheme() {
-    final textTheme = GoogleFonts.notoSansJpTextTheme();
+    final textTheme = GoogleFonts.zenMaruGothicTextTheme();
 
     return ThemeData(
       useMaterial3: true,
@@ -41,7 +41,7 @@ class BurariDateApp extends ConsumerWidget {
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: GoogleFonts.notoSansJp(
+        titleTextStyle: GoogleFonts.zenMaruGothic(
           color: AppColors.textPrimary,
           fontSize: 14,
           fontWeight: FontWeight.bold,
@@ -53,7 +53,7 @@ class BurariDateApp extends ConsumerWidget {
           foregroundColor: AppColors.background,
           minimumSize: const Size(double.infinity, 48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          textStyle: GoogleFonts.notoSansJp(
+          textStyle: GoogleFonts.zenMaruGothic(
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -66,7 +66,7 @@ class BurariDateApp extends ConsumerWidget {
           minimumSize: const Size(double.infinity, 48),
           side: const BorderSide(color: AppColors.primary, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          textStyle: GoogleFonts.notoSansJp(
+          textStyle: GoogleFonts.zenMaruGothic(
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -91,7 +91,7 @@ class BurariDateApp extends ConsumerWidget {
           borderRadius: BorderRadius.circular(6),
           borderSide: const BorderSide(color: AppColors.secondary, width: 2),
         ),
-        hintStyle: GoogleFonts.notoSansJp(
+        hintStyle: GoogleFonts.zenMaruGothic(
           color: AppColors.textSecondary,
           fontSize: 13,
         ),

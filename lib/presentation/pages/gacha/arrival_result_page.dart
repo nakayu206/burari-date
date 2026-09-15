@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
@@ -43,10 +44,9 @@ class ArrivalResultPage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.lg),
               Text(
                 result.arrivalStation.name,
-                style: const TextStyle(
+                style: GoogleFonts.mochiyPopOne(
                   color: AppColors.textPrimary,
                   fontSize: AppFontSizes.displayLarge,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
               const Spacer(flex: 7),
