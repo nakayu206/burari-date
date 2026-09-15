@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
@@ -22,12 +23,11 @@ class HomePage extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(flex: 3),
-              const Text(
+              Text(
                 'デートガチャ',
-                style: TextStyle(
+                style: GoogleFonts.mochiyPopOne(
                   color: AppColors.primary,
                   fontSize: AppFontSizes.displayLarge,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
