@@ -1,0 +1,48 @@
+name: CI
+
+# 何をする？
+#   PR と main への push のたびに、フォーマット・静的解析・テストを自動実行する。
+#   壊れたコードが main に入るのを防ぐのが目的。
+#
+# テスト方針
+#   - 単体テスト (test/): ウィジェット・ロジックを1件ずつ責務単位でテスト
+#   - 結合テスト (integration_test/): 実機/エミュレータが必要なため現在は CI から除外
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  analyze-and-test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. リポジトリのコードを取得
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Flutter SDK をセットアップ
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # 3. 依存パッケージを取得
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 4. フォーマットチェック（差分があれば失敗）
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart')
+
+      # 5. 静的解析
+      - name: Analyze
+        run: flutter analyze
+
+      # 6. 単体テスト
+      - name: Run unit tests
+        run: flutter test --reporter expanded
