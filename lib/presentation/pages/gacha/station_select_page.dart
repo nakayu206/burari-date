@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/railway_line.dart';
 import '../../providers/gacha_form_provider.dart';
 import 'gacha_animation_page.dart';
@@ -40,23 +43,32 @@ class StationSelectPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('出発駅・路線を選ぶ')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 '出発駅',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.labelSmall,
+                ),
               ),
               const SizedBox(height: 6),
               _SelectField(
                 label: formState.departure?.name ?? '駅名を入力(サジェスト表示)',
                 onTap: () => _pickDeparture(context, ref),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.lg),
               const Text(
                 '路線',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.labelSmall,
+                ),
               ),
               const SizedBox(height: 6),
               _SelectField(
@@ -65,12 +77,12 @@ class StationSelectPage extends ConsumerWidget {
                     ? null
                     : () => _pickDeparture(context, ref),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: AppSpacing.lg),
               Text(
                 '駅数範囲: ${formState.minStops}〜${formState.maxStops}駅隣',
                 style: const TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 13,
+                  fontSize: AppFontSizes.bodyMedium,
                 ),
               ),
               RangeSlider(
@@ -87,12 +99,15 @@ class StationSelectPage extends ConsumerWidget {
                     .read(gachaFormProvider.notifier)
                     .updateStopsRange(values.start.round(), values.end.round()),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.lg),
               const Text(
                 '方面',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.labelSmall,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               SegmentedButton<GachaDirection>(
                 segments: [
                   ButtonSegment(
@@ -117,7 +132,7 @@ class StationSelectPage extends ConsumerWidget {
                     .read(gachaFormProvider.notifier)
                     .updateDirection(selection.first),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: AppSpacing.lg),
               ElevatedButton(
                 onPressed: formState.canStartGacha
                     ? () => _startGacha(context, ref)
@@ -144,7 +159,7 @@ class _SelectField extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Container(
-        height: 44,
+        height: AppSizes.inputHeight,
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.centerLeft,
@@ -155,7 +170,10 @@ class _SelectField extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: AppFontSizes.bodyMedium,
+          ),
         ),
       ),
     );
