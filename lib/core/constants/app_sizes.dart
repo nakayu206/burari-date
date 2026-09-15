@@ -3,6 +3,7 @@ class AppSizes {
   const AppSizes._();
 
   static const buttonHeight = 48.0;
+  static const inputHeight = 44.0;
   static const cardWidth = 260.0;
   static const bottomNavHeight = 65.0;
 
