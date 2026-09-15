@@ -107,7 +107,7 @@ class StationSelectPage extends ConsumerWidget {
                   fontSize: AppFontSizes.labelSmall,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               SegmentedButton<GachaDirection>(
                 segments: [
                   ButtonSegment(
