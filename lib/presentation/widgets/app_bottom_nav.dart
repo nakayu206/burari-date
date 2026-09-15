@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_font_sizes.dart';
+import '../../core/constants/app_sizes.dart';
+import '../../core/constants/app_spacing.dart';
 import '../pages/history/history_page.dart';
 import '../pages/home/home_page.dart';
 import '../pages/settings/settings_page.dart';
@@ -32,7 +35,7 @@ class AppBottomNav extends StatelessWidget {
       children: [
         const Divider(height: 1),
         Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -83,13 +86,13 @@ class _NavItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: color),
+          Icon(icon, size: AppSizes.iconMd, color: color),
           const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
               color: color,
-              fontSize: 10,
+              fontSize: AppFontSizes.caption,
               fontWeight: selected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
