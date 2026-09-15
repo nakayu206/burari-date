@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_font_sizes.dart';
+import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/station.dart';
 import '../../providers/station_providers.dart';
+
+/// このモーダル内の全要素間の縦ギャップ。Figmaのノード座標では実測14pxだったが、
+/// 他画面と同じ16pxリズムに統一し、デザイントークンからの逸脱をなくした
+/// (docs/デザイントークン.md参照)。
+const _kGap = AppSpacing.lg;
 
 /// S-02b 出発駅検索(サジェスト)。S-02 の出発駅欄タップでモーダル表示する。
 Future<Station?> showStationSearchSheet(BuildContext context) {
@@ -47,10 +55,10 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: AppSpacing.xl,
+        right: AppSpacing.xl,
+        top: AppSpacing.xl,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -58,11 +66,14 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
         children: [
           const Text(
             '出発駅',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: AppFontSizes.labelSmall,
+            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: _kGap),
           Container(
-            height: 44,
+            height: AppSizes.inputHeight,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -73,7 +84,7 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
               children: [
                 const Icon(
                   Icons.train_rounded,
-                  size: 16,
+                  size: AppSizes.iconSm,
                   color: AppColors.secondary,
                 ),
                 const SizedBox(width: 8),
@@ -84,7 +95,7 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                     onChanged: _onChanged,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 14,
+                      fontSize: AppFontSizes.bodyLarge,
                     ),
                     decoration: const InputDecoration(
                       isCollapsed: true,
@@ -96,18 +107,21 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: _kGap),
           const Text(
             '候補',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 10),
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: AppFontSizes.caption,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: _kGap),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 280),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: _results.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: _kGap),
               itemBuilder: (context, index) {
                 final station = _results[index];
                 final line = stationRepository.findLineForStation(station);
@@ -137,7 +151,7 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                                 station.name,
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontSize: 14,
+                                  fontSize: AppFontSizes.bodyLarge,
                                 ),
                               ),
                               if (line != null)
@@ -145,7 +159,7 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                                   line.name,
                                   style: const TextStyle(
                                     color: AppColors.textSecondary,
-                                    fontSize: 10,
+                                    fontSize: AppFontSizes.caption,
                                   ),
                                 ),
                             ],
@@ -158,10 +172,13 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
               },
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: _kGap),
           const Text(
             '※タップすると入力欄に反映され、キーボードは閉じる',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: AppFontSizes.footnote,
+            ),
           ),
         ],
       ),
