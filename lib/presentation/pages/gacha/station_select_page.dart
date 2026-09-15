@@ -31,9 +31,7 @@ class StationSelectPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final formState = ref.watch(gachaFormProvider);
     final line = formState.line;
-    final maxStopsBound = line == null
-        ? 15.0
-        : (line.stations.length - 1).toDouble();
+    final maxStopsBound = formState.maxSelectableStops.toDouble();
     final stopsRange = RangeValues(
       formState.minStops.toDouble(),
       formState.maxStops.toDouble(),
@@ -99,6 +97,32 @@ class StationSelectPage extends ConsumerWidget {
                     .read(gachaFormProvider.notifier)
                     .updateStopsRange(values.start.round(), values.end.round()),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _StopsStepper(
+                    label: '最小',
+                    value: formState.minStops,
+                    onDecrement: () => ref
+                        .read(gachaFormProvider.notifier)
+                        .decrementMinStops(),
+                    onIncrement: () => ref
+                        .read(gachaFormProvider.notifier)
+                        .incrementMinStops(),
+                  ),
+                  _StopsStepper(
+                    label: '最大',
+                    value: formState.maxStops,
+                    onDecrement: () => ref
+                        .read(gachaFormProvider.notifier)
+                        .decrementMaxStops(),
+                    onIncrement: () => ref
+                        .read(gachaFormProvider.notifier)
+                        .incrementMaxStops(),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.lg),
               const Text(
                 '方面',
@@ -143,6 +167,78 @@ class StationSelectPage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 駅数範囲の1駅単位の微調整用ステッパー(Issue #38)。
+/// スライダーは大まかな調整、こちらは正確な値の指定に使う。
+class _StopsStepper extends StatelessWidget {
+  const _StopsStepper({
+    required this.label,
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final String label;
+  final int value;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: AppFontSizes.labelSmall,
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StepperButton(
+              icon: Icons.remove_circle_outline,
+              onTap: onDecrement,
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(
+                '$value駅',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: AppFontSizes.bodyLarge,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            _StepperButton(icon: Icons.add_circle_outline, onTap: onIncrement),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, color: AppColors.primary, size: AppSizes.iconMd),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
     );
   }
 }
