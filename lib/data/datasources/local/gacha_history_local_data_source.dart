@@ -29,8 +29,12 @@ class GachaHistoryLocalDataSource {
 
   Future<void> save(List<GachaHistoryEntry> entries) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_key, [
+    final didSave = await prefs.setStringList(_key, [
       for (final entry in entries) jsonEncode(entry.toJson()),
     ]);
+    // setStringListはfalseを返すことがあり、その場合保存されていない。
+    if (!didSave) {
+      throw Exception('履歴の保存に失敗しました');
+    }
   }
 }

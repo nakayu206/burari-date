@@ -155,30 +155,22 @@ class StationSelectPage extends ConsumerWidget {
                 segments: [
                   ButtonSegment(
                     value: GachaDirection.up,
-                    label: Text(
-                      line == null ? '○○方面' : '${line.endTerminus.name}方面',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
+                    // 見出しに既に「方面」とあるため、ここでは繰り返さず
+                    // 駅名だけにして文字数を減らす(長い駅名でも読める
+                    // ようにするため)。
+                    label: _DirectionLabel(
+                      line == null ? '○○' : line.endTerminus.name,
                     ),
                   ),
                   ButtonSegment(
                     value: GachaDirection.down,
-                    label: Text(
-                      line == null ? '△△方面' : '${line.startTerminus.name}方面',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
+                    label: _DirectionLabel(
+                      line == null ? '△△' : line.startTerminus.name,
                     ),
                   ),
                   const ButtonSegment(
                     value: GachaDirection.random,
-                    label: Text(
-                      'おまかせ',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    label: _DirectionLabel('おまかせ'),
                   ),
                 ],
                 selected: {formState.direction},
@@ -269,6 +261,27 @@ class _StepperButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
+    );
+  }
+}
+
+/// 方面SegmentedButtonのラベル。省略(ellipsis)だと長い駅名が読めなくなる
+/// ため、FittedBoxで縮小して全文を表示する(基準フォントを控えめにして
+/// おき、縮小しすぎて読みにくくならないようにする)。
+class _DirectionLabel extends StatelessWidget {
+  const _DirectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        text,
+        maxLines: 1,
+        style: const TextStyle(fontSize: AppFontSizes.bodyMedium),
+      ),
     );
   }
 }

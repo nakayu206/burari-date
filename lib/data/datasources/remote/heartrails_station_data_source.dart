@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -48,38 +49,54 @@ class HeartRailsStationDataSource {
     '京成',
   ];
 
-  /// 路線名で駅を検索する(S-02b)。HeartRails Expressの路線検索は事業者名
-  /// 込みの完全一致のみ対応のため、入力そのものに加えて主要事業者接頭辞を
-  /// 付けた候補も試す(「山手線」→「JR山手線」等)。いずれかにヒットした
-  /// 路線の全駅を返す。
+  /// 路線名で駅を検索する(S-02b)。事業者接頭辞候補のうち最初にヒットした
+  /// ものを即返し、全滅時のみ空リスト/通信エラーを伝える。
   Future<List<Station>> searchStationsByLine(String query) async {
     if (query.isEmpty) return const [];
     final candidates = <String>{
       query,
       for (final prefix in _commonOperatorPrefixes) '$prefix$query',
     };
-    final results = await Future.wait([
-      for (final candidate in candidates) _searchExactLine(candidate),
-    ]);
-    for (final stations in results) {
-      if (stations.isNotEmpty) return stations;
+
+    final completer = Completer<List<Station>>();
+    var pending = candidates.length;
+    Object? lastError;
+
+    for (final candidate in candidates) {
+      _fetchStationsForLineName(candidate).then(
+        (stations) {
+          if (completer.isCompleted) return;
+          if (stations.isNotEmpty) {
+            completer.complete(stations);
+            return;
+          }
+          pending--;
+          if (pending == 0) {
+            if (lastError != null) {
+              completer.completeError(lastError!);
+            } else {
+              completer.complete(const []);
+            }
+          }
+        },
+        onError: (Object error) {
+          if (completer.isCompleted) return;
+          lastError = error;
+          pending--;
+          if (pending == 0) completer.completeError(error);
+        },
+      );
     }
-    return const [];
+
+    return completer.future;
   }
 
-  /// 候補1件分の完全一致検索。通信エラー等は「この候補はヒットしなかった」
-  /// として扱う(他の候補やsearchStationsByNameが実際の通信断を拾うため、
-  /// ここで例外を投げて全体を失敗させる必要はない)。
-  Future<List<Station>> _searchExactLine(String lineName) async {
-    try {
-      final uri = _baseUri.replace(
-        queryParameters: {'method': 'getStations', 'line': lineName},
-      );
-      final rawList = await _fetchRawStations(uri);
-      return _toStations(rawList);
-    } on HeartRailsException {
-      return const [];
-    }
+  Future<List<Station>> _fetchStationsForLineName(String lineName) async {
+    final uri = _baseUri.replace(
+      queryParameters: {'method': 'getStations', 'line': lineName},
+    );
+    final rawList = await _fetchRawStations(uri);
+    return _toStations(rawList);
   }
 
   /// 指定した路線名に属する全駅を取得する。あわせて、始発・終着が隣接する

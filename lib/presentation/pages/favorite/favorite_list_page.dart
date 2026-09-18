@@ -51,6 +51,8 @@ class _FavoriteRow extends ConsumerWidget {
   final Favorite favorite;
 
   Future<void> _remove(BuildContext context, WidgetRef ref) async {
+    // refはウィジェットと運命を共にするため、破棄後も使えるcontainer経由でinvalidateする。
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref
           .read(favoriteRepositoryProvider)
@@ -63,10 +65,8 @@ class _FavoriteRow extends ConsumerWidget {
       }
       return;
     }
-    // awaitの間にウィジェットが破棄されているとrefの使用自体が例外になる。
-    if (!context.mounted) return;
-    ref.invalidate(favoritesProvider);
-    ref.invalidate(isFavoriteProvider(favorite.candidateId));
+    container.invalidate(favoritesProvider);
+    container.invalidate(isFavoriteProvider(favorite.candidateId));
   }
 
   @override

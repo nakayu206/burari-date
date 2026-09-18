@@ -195,6 +195,9 @@ class CandidateDetailPage extends ConsumerWidget {
     WidgetRef ref, {
     required bool isSaved,
   }) async {
+    // ウィジェットが破棄されてもキャッシュ更新は行いたいので、refではなく
+    // 破棄されないcontainer経由でinvalidateする(refはウィジェットと運命を共にする)。
+    final container = ProviderScope.containerOf(context, listen: false);
     final repository = ref.read(favoriteRepositoryProvider);
     String message;
     try {
@@ -205,14 +208,12 @@ class CandidateDetailPage extends ConsumerWidget {
         await repository.addFavorite(Favorite.fromCandidate(candidate));
         message = 'お気に入りに保存しました';
       }
+      container.invalidate(isFavoriteProvider(candidate.id));
+      container.invalidate(favoritesProvider);
     } on Exception {
       message = isSaved ? '解除に失敗しました' : '保存に失敗しました';
     }
-    // awaitの間にウィジェットが破棄されているとrefの使用自体が例外になるため、
-    // invalidate呼び出しもmountedチェックの内側に入れる。
     if (!context.mounted) return;
-    ref.invalidate(isFavoriteProvider(candidate.id));
-    ref.invalidate(favoritesProvider);
     ScaffoldMessenger.of(context)
       ..clearSnackBars() // 連打時に古いSnackBarが表示待ちで詰まらないようにする。
       ..showSnackBar(SnackBar(content: Text(message)));

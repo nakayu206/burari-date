@@ -29,8 +29,12 @@ class FavoriteLocalDataSource {
 
   Future<void> save(List<Favorite> favorites) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_key, [
+    final didSave = await prefs.setStringList(_key, [
       for (final favorite in favorites) jsonEncode(favorite.toJson()),
     ]);
+    // setStringListはfalseを返すことがあり、その場合保存されていない。
+    if (!didSave) {
+      throw Exception('お気に入りの保存に失敗しました');
+    }
   }
 }

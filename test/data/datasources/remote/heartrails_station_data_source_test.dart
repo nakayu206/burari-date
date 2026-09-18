@@ -321,6 +321,49 @@ void main() {
       expect(stations, isEmpty);
       expect(called, isFalse);
     });
+
+    test('全候補が通信エラーだった場合は「該当なし」ではなく例外を投げる', () async {
+      final client = MockClient((request) async {
+        return http.Response('error', 500);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      expect(
+        () => dataSource.searchStationsByLine('山手線'),
+        throwsA(isA<HeartRailsException>()),
+      );
+    });
+
+    test('一部の候補がエラーでも、別の候補がヒットすればその結果を返す', () async {
+      final client = MockClient((request) async {
+        final line = request.url.queryParameters['line'];
+        if (line == 'JR山手線') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "品川", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        if (line == '都営山手線') {
+          return http.Response('error', 500);
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('山手線');
+
+      expect(stations, isNotEmpty);
+      expect(stations.first.lineId, 'JR山手線');
+    });
   });
 }
 
