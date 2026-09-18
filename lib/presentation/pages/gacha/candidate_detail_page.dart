@@ -9,12 +9,17 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/station.dart';
 
+/// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
+/// テストでは実プラットフォーム呼び出し(ブラウザ起動等)を避けるため差し替える。
+typedef UrlLauncher = Future<bool> Function(Uri url, {LaunchMode mode});
+
 /// S-06 候補詳細画面
 class CandidateDetailPage extends StatelessWidget {
   const CandidateDetailPage({
     super.key,
     required this.candidate,
     this.fallbackStation,
+    @visibleForTesting this.launchUrlOverride = launchUrl,
   });
 
   final Candidate candidate;
@@ -23,11 +28,23 @@ class CandidateDetailPage extends StatelessWidget {
   /// 地図の中心として代わりに使う到着駅。
   final Station? fallbackStation;
 
+  final UrlLauncher launchUrlOverride;
+
+  /// 候補と到着駅の座標を混ぜて組み合わせない(例えば候補にlatitudeだけ設定
+  /// されていた場合、そこにfallbackStationのlongitudeを組み合わせると
+  /// 全く無関係な地点を指してしまう)。どちらかのペアをまるごと使う。
   LatLng? get _location {
-    final lat = candidate.latitude ?? fallbackStation?.latitude;
-    final lng = candidate.longitude ?? fallbackStation?.longitude;
-    if (lat == null || lng == null) return null;
-    return LatLng(lat, lng);
+    final candidateLat = candidate.latitude;
+    final candidateLng = candidate.longitude;
+    if (candidateLat != null && candidateLng != null) {
+      return LatLng(candidateLat, candidateLng);
+    }
+    final stationLat = fallbackStation?.latitude;
+    final stationLng = fallbackStation?.longitude;
+    if (stationLat != null && stationLng != null) {
+      return LatLng(stationLat, stationLng);
+    }
+    return null;
   }
 
   @override
@@ -99,7 +116,7 @@ class CandidateDetailPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             if (location != null)
               OutlinedButton.icon(
-                onPressed: () => _openDirections(location),
+                onPressed: () => _openDirections(context, location),
                 icon: const Icon(Icons.directions_rounded),
                 label: const Text('経路案内を開く'),
               ),
@@ -118,12 +135,36 @@ class CandidateDetailPage extends StatelessWidget {
     );
   }
 
-  Future<void> _openDirections(LatLng location) async {
+  Future<void> _openDirections(BuildContext context, LatLng location) async {
     final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1'
-      '&query=${location.latitude},${location.longitude}',
+      'https://www.google.com/maps/dir/?api=1'
+      '&destination=${location.latitude},${location.longitude}',
     );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    bool launched;
+    try {
+      launched = await launchUrlOverride(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } on Exception {
+      launched = false;
+    }
+    // 通信・外部連携エラーは見逃されないようダイアログで表示する(docs/コード規約.md)。
+    if (!launched && context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('地図アプリを開けませんでした'),
+          content: const Text('地図アプリがインストールされていないか、開けない状態です。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('閉じる'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
 
@@ -157,10 +198,13 @@ class _CandidateMap extends StatelessWidget {
                   point: location,
                   width: 36,
                   height: 36,
-                  child: const Icon(
-                    Icons.location_pin,
-                    color: AppColors.primary,
-                    size: 36,
+                  child: Tooltip(
+                    message: label,
+                    child: const Icon(
+                      Icons.location_pin,
+                      color: AppColors.primary,
+                      size: 36,
+                    ),
                   ),
                 ),
               ],

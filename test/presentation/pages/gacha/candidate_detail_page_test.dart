@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/station.dart';
@@ -85,6 +86,156 @@ void main() {
       final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
       expect(map.options.initialCenter.latitude, 35.0);
       expect(map.options.initialCenter.longitude, 135.0);
+    });
+
+    testWidgets('マーカーには候補名がツールチップとして設定される', (tester) async {
+      const station = Station(
+        id: 's1',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 0,
+        latitude: 35.69,
+        longitude: 139.70,
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CandidateDetailPage(
+            candidate: candidateWithoutLocation,
+            fallbackStation: station,
+          ),
+        ),
+      );
+
+      expect(find.byTooltip('テスト洋食屋'), findsOneWidget);
+    });
+
+    testWidgets('地図アプリを開けなかった場合はダイアログで知らせる', (tester) async {
+      const station = Station(
+        id: 's1',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 0,
+        latitude: 35.69,
+        longitude: 139.70,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CandidateDetailPage(
+            candidate: candidateWithoutLocation,
+            fallbackStation: station,
+            launchUrlOverride:
+                (uri, {mode = LaunchMode.platformDefault}) async => false,
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('経路案内を開く'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('地図アプリを開けませんでした'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(find.text('地図アプリを開けませんでした'), findsNothing);
+    });
+
+    testWidgets('地図アプリが開けた場合はダイアログを出さない', (tester) async {
+      const station = Station(
+        id: 's1',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 0,
+        latitude: 35.69,
+        longitude: 139.70,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CandidateDetailPage(
+            candidate: candidateWithoutLocation,
+            fallbackStation: station,
+            launchUrlOverride:
+                (uri, {mode = LaunchMode.platformDefault}) async => true,
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('経路案内を開く'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('地図アプリを開けませんでした'), findsNothing);
+    });
+
+    testWidgets('経路案内は検索ではなくルート案内(dir)モードでGoogleマップを開く', (tester) async {
+      const station = Station(
+        id: 's1',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 0,
+        latitude: 35.69,
+        longitude: 139.70,
+      );
+      Uri? capturedUri;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CandidateDetailPage(
+            candidate: candidateWithoutLocation,
+            fallbackStation: station,
+            launchUrlOverride:
+                (uri, {mode = LaunchMode.platformDefault}) async {
+                  capturedUri = uri;
+                  return true;
+                },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('経路案内を開く'));
+      await tester.pumpAndSettle();
+
+      expect(capturedUri, isNotNull);
+      expect(capturedUri!.path, '/maps/dir/');
+      expect(capturedUri!.queryParameters['destination'], '35.69,139.7');
+    });
+
+    testWidgets('候補の緯度だけ設定されていても、到着駅の座標と混ざらない', (tester) async {
+      const candidatePartialLocation = Candidate(
+        id: 'c3',
+        category: CandidateCategory.gourmet,
+        name: 'テスト店',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 2,
+        latitude: 10.0,
+        // longitudeは意図的に未設定。
+      );
+      const station = Station(
+        id: 's1',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 0,
+        latitude: 35.69,
+        longitude: 139.70,
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CandidateDetailPage(
+            candidate: candidatePartialLocation,
+            fallbackStation: station,
+          ),
+        ),
+      );
+
+      // 候補側の緯度(10.0)と駅側の経度(139.70)を組み合わせず、
+      // 駅の座標をまるごとフォールバックとして使う。
+      final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(map.options.initialCenter.latitude, 35.69);
+      expect(map.options.initialCenter.longitude, 139.70);
     });
   });
 }
