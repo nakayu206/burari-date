@@ -14,10 +14,17 @@ class GachaHistoryLocalDataSource {
   Future<List<GachaHistoryEntry>> load() async {
     final prefs = await SharedPreferences.getInstance();
     final rawEntries = prefs.getStringList(_key) ?? const [];
-    return [
-      for (final raw in rawEntries)
-        GachaHistoryEntry.fromJson(jsonDecode(raw) as Map<String, dynamic>),
-    ];
+    final entries = <GachaHistoryEntry>[];
+    for (final raw in rawEntries) {
+      try {
+        entries.add(
+          GachaHistoryEntry.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+        );
+      } catch (_) {
+        continue; // 壊れた1件だけ読み飛ばす(キャスト失敗はTypeErrorなのでExceptionでは拾えない)。
+      }
+    }
+    return entries;
   }
 
   Future<void> save(List<GachaHistoryEntry> entries) async {

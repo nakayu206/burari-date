@@ -11,6 +11,9 @@ class GachaHistoryRepositoryImpl implements GachaHistoryRepository {
   /// 際限なく増え続けないよう、直近この件数だけ保持する。
   static const maxEntries = 50;
 
+  /// addEntryのread-modify-writeを直列化し、同時書き込みでの更新の取りこぼしを防ぐキュー。
+  Future<void> _writeQueue = Future<void>.value();
+
   @override
   Future<List<GachaHistoryEntry>> loadHistory() async {
     final entries = await _dataSource.load();
@@ -19,11 +22,15 @@ class GachaHistoryRepositoryImpl implements GachaHistoryRepository {
   }
 
   @override
-  Future<void> addEntry(GachaHistoryEntry entry) async {
-    final entries = await _dataSource.load()
-      ..add(entry)
-      ..sort((a, b) => b.executedAt.compareTo(a.executedAt));
-    final trimmed = entries.take(maxEntries).toList();
-    await _dataSource.save(trimmed);
+  Future<void> addEntry(GachaHistoryEntry entry) {
+    final result = _writeQueue.then((_) async {
+      final entries = await _dataSource.load()
+        ..add(entry)
+        ..sort((a, b) => b.executedAt.compareTo(a.executedAt));
+      final trimmed = entries.take(maxEntries).toList();
+      await _dataSource.save(trimmed);
+    });
+    _writeQueue = result.catchError((_) {}); // 失敗してもキューを詰まらせない。
+    return result;
   }
 }

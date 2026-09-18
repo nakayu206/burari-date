@@ -50,5 +50,20 @@ void main() {
         '駅${GachaHistoryRepositoryImpl.maxEntries + 4}',
       );
     });
+
+    test('同時にaddEntryを呼んでも両方保存される(直列化されている)', () async {
+      final repository = GachaHistoryRepositoryImpl();
+
+      final future1 = repository.addEntry(_entry('A', DateTime(2026, 1, 1)));
+      final future2 = repository.addEntry(_entry('B', DateTime(2026, 1, 2)));
+      await Future.wait([future1, future2]);
+
+      final history = await repository.loadHistory();
+
+      expect(
+        history.map((e) => e.arrivalStationName),
+        unorderedEquals(['A', 'B']),
+      );
+    });
   });
 }

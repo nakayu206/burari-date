@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -62,6 +64,29 @@ void main() {
 
       expect(loaded, hasLength(1));
       expect(loaded.single.arrivalStationName, 'd');
+    });
+
+    test('壊れたエントリが1件混ざっていても、他の正常なエントリは読み込める', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final validEntry = GachaHistoryEntry(
+        departureStationName: 'x',
+        lineName: 'l',
+        arrivalStationName: 'y',
+        stopsCount: 1,
+        direction: GachaDirection.up,
+        executedAt: DateTime(2026, 1, 1),
+      );
+      // キー名はGachaHistoryLocalDataSourceの内部キーと一致させる必要がある。
+      await prefs.setStringList('gacha_history_entries', [
+        '{"broken": true}',
+        jsonEncode(validEntry.toJson()),
+      ]);
+      const dataSource = GachaHistoryLocalDataSource();
+
+      final entries = await dataSource.load();
+
+      expect(entries, hasLength(1));
+      expect(entries.single.arrivalStationName, 'y');
     });
   });
 }
