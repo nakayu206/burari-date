@@ -58,11 +58,16 @@ class HeartRailsStationDataSource {
     return [for (var i = 0; i < rawList.length; i++) _toStation(rawList[i], i)];
   }
 
+  static const _timeout = Duration(seconds: 10);
+
   Future<List<Map<String, dynamic>>> _fetchRawStations(Uri uri) async {
     final http.Response response;
     try {
-      response = await _client.get(uri);
+      response = await _client.get(uri).timeout(_timeout);
     } on Exception catch (e) {
+      // TimeoutExceptionもExceptionを実装しているのでここで一緒に拾える。
+      // タイムアウトが無いと、通信が固まった際にローディング表示が
+      // 永久に終わらなくなる。
       throw HeartRailsException('駅データの取得に失敗しました: $e');
     }
     if (response.statusCode != 200) {

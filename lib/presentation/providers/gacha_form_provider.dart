@@ -55,6 +55,8 @@ class GachaFormState {
     int? minStops,
     int? maxStops,
     GachaDirection? direction,
+    bool? isLoadingLine,
+    String? lineError,
   }) {
     return GachaFormState(
       departure: departure ?? this.departure,
@@ -62,6 +64,8 @@ class GachaFormState {
       minStops: minStops ?? this.minStops,
       maxStops: maxStops ?? this.maxStops,
       direction: direction ?? this.direction,
+      isLoadingLine: isLoadingLine ?? this.isLoadingLine,
+      lineError: lineError ?? this.lineError,
     );
   }
 }
@@ -70,10 +74,16 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
   @override
   GachaFormState build() => const GachaFormState();
 
+  /// [selectDeparture]の呼び出しを識別する通し番号。駅名だけでは、同じ駅を
+  /// ローディング中に再選択した場合に新旧どちらのリクエストか区別できない
+  /// ため、単調増加のトークンで「一番最後に発行したリクエストか」を判定する。
+  int _selectDepartureRequestId = 0;
+
   /// 出発駅を選び、所属路線の全駅データをHeartRails Expressから取得する
   /// (Issue #2)。ネットワークI/Oを伴うため、取得完了までは[isLoadingLine]、
   /// 失敗時は[lineError]で画面側に伝える。
   Future<void> selectDeparture(Station station) async {
+    final requestId = ++_selectDepartureRequestId;
     state = GachaFormState(
       departure: station,
       minStops: state.minStops,
@@ -92,8 +102,9 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
       error = '路線情報の取得に失敗しました: $e';
     }
 
-    // awaitの間にユーザーが別の駅を選び直していたら、この結果は古いので捨てる。
-    if (state.departure?.id != station.id) return;
+    // awaitの間に別のselectDeparture呼び出しが発行されていたら、この結果は
+    // 古いので捨てる(同じ駅の再選択も含めて、最新のリクエストだけを反映)。
+    if (requestId != _selectDepartureRequestId) return;
 
     final maxSelectable = line == null
         ? kMaxSelectableStops

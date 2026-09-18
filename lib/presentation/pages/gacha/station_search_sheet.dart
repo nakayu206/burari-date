@@ -59,6 +59,10 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
   void _onChanged(String value) {
     _debounce?.cancel();
     if (value.isEmpty) {
+      // _debounce.cancel()は「まだ発火していないタイマー」しか止められない。
+      // 既に発火して実行中の_searchがあれば、通し番号を進めて無効化する
+      // (でないと後から届いた古い検索結果でこの空表示が上書きされる)。
+      _requestId++;
       setState(() {
         _results = const [];
         _isSearching = false;

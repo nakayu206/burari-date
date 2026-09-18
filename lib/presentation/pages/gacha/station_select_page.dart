@@ -58,7 +58,11 @@ class StationSelectPage extends ConsumerWidget {
               const SizedBox(height: 6),
               _SelectField(
                 label: formState.departure?.name ?? '駅名を入力(サジェスト表示)',
-                onTap: () => _pickDeparture(context, ref),
+                // 路線データ取得中に別の駅を選び直すと余分なリクエストが飛ぶため
+                // (通し番号で結果は正しく捌けるが)、待機中はタップを止める。
+                onTap: formState.isLoadingLine
+                    ? null
+                    : () => _pickDeparture(context, ref),
               ),
               const SizedBox(height: AppSpacing.lg),
               const Text(
@@ -73,7 +77,7 @@ class StationSelectPage extends ConsumerWidget {
                 label: formState.isLoadingLine
                     ? '路線データを取得中…'
                     : (line?.name ?? '路線を選択'),
-                onTap: formState.departure == null
+                onTap: formState.departure == null || formState.isLoadingLine
                     ? null
                     : () => _pickDeparture(context, ref),
               ),
