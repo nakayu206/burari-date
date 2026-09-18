@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 class TrainIllustration extends StatelessWidget {
   const TrainIllustration({super.key});
 
-  static const width = 316.0;
+  // canvas.translate(10, -192)後、パンタグラフ台座(元座標x=300+10幅)が
+  // x=320まで届くため、316だと右端が切れる可能性がある(CodeRabbit指摘)。
+  static const width = 320.0;
   static const height = 155.0;
 
   @override

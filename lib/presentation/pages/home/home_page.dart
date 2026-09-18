@@ -72,7 +72,11 @@ class HomePage extends StatelessWidget {
                 child: const Text('ガチャを始める'),
               ),
               const Spacer(flex: 5),
-              const _HomeIllustration(),
+              // ColumnはExpanded/Flexibleでない子には縦方向を無制限で渡すため、
+              // Expandedで高さを確定させないとFittedBoxが両軸で縮小判定でき
+              // ず、横長など高さの狭い画面でオーバーフローしうる(CodeRabbit
+              // 指摘)。
+              const Expanded(flex: 5, child: _HomeIllustration()),
               const Spacer(flex: 4),
             ],
           ),
@@ -101,6 +105,7 @@ class _HomeIllustration extends StatelessWidget {
   Widget build(BuildContext context) {
     return FittedBox(
       fit: BoxFit.scaleDown,
+      alignment: Alignment.bottomCenter,
       child: SizedBox(
         width: _totalWidth,
         height: TrainIllustration.height + 14,

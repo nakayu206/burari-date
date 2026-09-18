@@ -489,7 +489,11 @@ class _FlapCardState extends State<_FlapCard>
       vsync: this,
       duration: _kBlankFlipDuration,
     )..addListener(_onTick);
-    unawaited(_runSpins());
+    // ウィジェットが破棄されるとdisposeがコントローラーを止め、進行中の
+    // forward()の完了をawaitしている_runSpinsにTickerCanceledが伝わりうる
+    // (例: フリップ中に画面を戻る操作)。ハンドラを付けないとZoneの未処理
+    // エラーとして報告されるため、ここで握りつぶす(CodeRabbit指摘)。
+    unawaited(_runSpins().catchError((_) {}, test: (e) => e is TickerCanceled));
   }
 
   /// 文字を明かさない空フリップを数回行ってから、最後に[text]を1回のフリップで確定させる。
