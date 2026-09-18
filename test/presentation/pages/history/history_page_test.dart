@@ -3,13 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:burari_date/domain/entities/gacha_history_entry.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
+import 'package:burari_date/presentation/pages/favorite/favorite_list_page.dart';
 import 'package:burari_date/presentation/pages/history/history_page.dart';
 import 'package:burari_date/presentation/providers/gacha_history_providers.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('HistoryPage', () {
     testWidgets('履歴が0件の場合は空状態を表示する', (tester) async {
       await tester.pumpWidget(
@@ -121,6 +127,23 @@ void main() {
 
       expect(find.text('履歴を読み込めませんでした'), findsNothing);
       expect(find.text('まだガチャの履歴がありません'), findsOneWidget);
+    });
+
+    testWidgets('お気に入りアイコンをタップするとお気に入り一覧画面に遷移する', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            gachaHistoryProvider.overrideWith((ref) async => const []),
+          ],
+          child: const MaterialApp(home: HistoryPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.star_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FavoriteListPage), findsOneWidget);
     });
   });
 }
