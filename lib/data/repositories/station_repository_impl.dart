@@ -1,31 +1,29 @@
 import '../../domain/entities/railway_line.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/repositories/station_repository.dart';
-import '../datasources/local/mock_station_data_source.dart';
+import '../datasources/remote/heartrails_station_data_source.dart';
 
 class StationRepositoryImpl implements StationRepository {
-  StationRepositoryImpl({MockStationDataSource? dataSource})
-    : _dataSource = dataSource ?? const MockStationDataSource();
+  StationRepositoryImpl({HeartRailsStationDataSource? dataSource})
+    : _dataSource = dataSource ?? HeartRailsStationDataSource();
 
-  final MockStationDataSource _dataSource;
+  final HeartRailsStationDataSource _dataSource;
 
   @override
-  List<Station> searchStations(String query) {
-    if (query.isEmpty) return const [];
-    final results = <Station>[];
-    for (final line in _dataSource.lines) {
-      for (final station in line.stations) {
-        if (station.name.contains(query)) results.add(station);
-      }
-    }
-    return results;
+  Future<List<Station>> searchStations(String query) {
+    if (query.isEmpty) return Future.value(const []);
+    return _dataSource.searchStationsByName(query);
   }
 
   @override
-  RailwayLine? findLineForStation(Station station) {
-    for (final line in _dataSource.lines) {
-      if (line.stations.any((s) => s.id == station.id)) return line;
-    }
-    return null;
+  Future<RailwayLine?> findLineForStation(Station station) async {
+    final result = await _dataSource.fetchStationsForLine(station.lineId);
+    if (result.stations.isEmpty) return null;
+    return RailwayLine(
+      id: station.lineId,
+      name: station.lineId,
+      stations: result.stations,
+      isCircular: result.isCircular,
+    );
   }
 }

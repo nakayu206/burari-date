@@ -6,11 +6,17 @@ class RailwayLine {
     required this.id,
     required this.name,
     required this.stations,
+    this.isCircular = false,
   });
 
   final String id;
   final String name;
   final List<Station> stations;
+
+  /// 山手線・大阪環状線のような環状路線の場合true。
+  /// 始発・終着が実際には隣接しているため、駅ガチャの隣接駅数計算(RunGacha)
+  /// で末端打ち切りではなく一周する計算に切り替える必要がある。
+  final bool isCircular;
 
   Station get startTerminus => stations.first;
   Station get endTerminus => stations.last;

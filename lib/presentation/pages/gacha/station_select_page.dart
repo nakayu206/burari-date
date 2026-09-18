@@ -17,7 +17,7 @@ class StationSelectPage extends ConsumerWidget {
   Future<void> _pickDeparture(BuildContext context, WidgetRef ref) async {
     final station = await showStationSearchSheet(context);
     if (station == null) return;
-    ref.read(gachaFormProvider.notifier).selectDeparture(station);
+    await ref.read(gachaFormProvider.notifier).selectDeparture(station);
   }
 
   void _startGacha(BuildContext context, WidgetRef ref) {
@@ -70,11 +70,23 @@ class StationSelectPage extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               _SelectField(
-                label: line?.name ?? '路線を選択',
+                label: formState.isLoadingLine
+                    ? '路線データを取得中…'
+                    : (line?.name ?? '路線を選択'),
                 onTap: formState.departure == null
                     ? null
                     : () => _pickDeparture(context, ref),
               ),
+              if (formState.lineError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  formState.lineError!,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: AppFontSizes.footnote,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
               Text(
                 '駅数範囲: ${formState.minStops}〜${formState.maxStops}駅隣',

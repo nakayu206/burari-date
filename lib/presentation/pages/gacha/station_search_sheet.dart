@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -37,22 +39,58 @@ class _StationSearchSheet extends ConsumerStatefulWidget {
 class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
   final _controller = TextEditingController();
   List<Station> _results = const [];
+  bool _isSearching = false;
+  bool _hasError = false;
+  Timer? _debounce;
+
+  /// 連打/連続入力のたびにAPIを叩かないよう、入力が止まってから検索する。
+  static const _debounceDuration = Duration(milliseconds: 400);
+
+  /// awaitの間に別の検索が走った場合、古い結果を捨てるための通し番号。
+  int _requestId = 0;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   void _onChanged(String value) {
+    _debounce?.cancel();
+    if (value.isEmpty) {
+      setState(() {
+        _results = const [];
+        _isSearching = false;
+        _hasError = false;
+      });
+      return;
+    }
+    setState(() => _isSearching = true);
+    _debounce = Timer(_debounceDuration, () => _search(value));
+  }
+
+  Future<void> _search(String query) async {
+    final requestId = ++_requestId;
     final repository = ref.read(stationRepositoryProvider);
-    setState(() => _results = repository.searchStations(value));
+    List<Station> results;
+    var hasError = false;
+    try {
+      results = await repository.searchStations(query);
+    } on Exception {
+      results = const [];
+      hasError = true;
+    }
+    if (!mounted || requestId != _requestId) return;
+    setState(() {
+      _results = results;
+      _isSearching = false;
+      _hasError = hasError;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final stationRepository = ref.watch(stationRepositoryProvider);
-
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.xl,
@@ -108,13 +146,35 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
             ),
           ),
           const SizedBox(height: _kGap),
-          const Text(
-            '候補',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: AppFontSizes.caption,
-            ),
+          Row(
+            children: [
+              const Text(
+                '候補',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.caption,
+                ),
+              ),
+              if (_isSearching) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ],
           ),
+          if (_hasError) ...[
+            const SizedBox(height: 4),
+            const Text(
+              '検索に失敗しました。通信環境をご確認ください。',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: AppFontSizes.footnote,
+              ),
+            ),
+          ],
           const SizedBox(height: _kGap),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 280),
@@ -124,7 +184,9 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
               separatorBuilder: (_, _) => const SizedBox(height: _kGap),
               itemBuilder: (context, index) {
                 final station = _results[index];
-                final line = stationRepository.findLineForStation(station);
+                // HeartRails Express実装ではlineIdが路線の表示名そのものなので、
+                // 一覧表示のためだけに1行ずつ路線検索APIを呼ばずに済む。
+                final lineName = station.lineId;
                 return Material(
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(6),
@@ -154,14 +216,13 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                                   fontSize: AppFontSizes.bodyLarge,
                                 ),
                               ),
-                              if (line != null)
-                                Text(
-                                  line.name,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: AppFontSizes.caption,
-                                  ),
+                              Text(
+                                lineName,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: AppFontSizes.caption,
                                 ),
+                              ),
                             ],
                           ),
                         ],

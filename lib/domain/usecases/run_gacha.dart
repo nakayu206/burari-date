@@ -30,8 +30,13 @@ class RunGacha {
         ? (_random.nextBool() ? GachaDirection.up : GachaDirection.down)
         : direction;
 
-    final maxReachable = resolvedDirection == GachaDirection.up
-        ? line.stations.length - 1 - departureIndex
+    final stationCount = line.stations.length;
+    // 環状路線(山手線・大阪環状線等)は始発・終着が実際には隣接しているため、
+    // 配列の端で打ち切らず一周分(stationCount-1駅)まで狙えるようにする。
+    final maxReachable = line.isCircular
+        ? stationCount - 1
+        : resolvedDirection == GachaDirection.up
+        ? stationCount - 1 - departureIndex
         : departureIndex;
 
     final clampedMax = min(maxStops, maxReachable);
@@ -41,9 +46,14 @@ class RunGacha {
         ? clampedMax
         : clampedMin + _random.nextInt(clampedMax - clampedMin + 1);
 
-    final arrivalIndex = resolvedDirection == GachaDirection.up
+    final rawArrivalIndex = resolvedDirection == GachaDirection.up
         ? departureIndex + stopsCount
         : departureIndex - stopsCount;
+    // Dartの%は除数が正なら常に非負を返す(Euclidean mod)ため、
+    // 負の値でも折り返しのインデックス計算にそのまま使える。
+    final arrivalIndex = line.isCircular
+        ? rawArrivalIndex % stationCount
+        : rawArrivalIndex;
 
     return GachaResult(
       departureStation: departure,

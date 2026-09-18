@@ -21,6 +21,8 @@ class GachaFormState {
     this.minStops = 2,
     this.maxStops = 7,
     this.direction = GachaDirection.random,
+    this.isLoadingLine = false,
+    this.lineError,
   });
 
   final Station? departure;
@@ -28,6 +30,14 @@ class GachaFormState {
   final int minStops;
   final int maxStops;
   final GachaDirection direction;
+
+  /// 出発駅選択後、所属路線の全駅リストを外部APIから取得している間true
+  /// (Issue #2: HeartRails Expressへのリモートアクセスに置き換えたため)。
+  final bool isLoadingLine;
+
+  /// 路線データの取得に失敗した場合のメッセージ。画面内表示用
+  /// (docs/コード規約.md: 受動的なロード失敗は画面内表示でよい)。
+  final String? lineError;
 
   bool get canStartGacha => departure != null && line != null;
 
@@ -60,10 +70,31 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
   @override
   GachaFormState build() => const GachaFormState();
 
-  void selectDeparture(Station station) {
-    final line = ref
-        .read(stationRepositoryProvider)
-        .findLineForStation(station);
+  /// 出発駅を選び、所属路線の全駅データをHeartRails Expressから取得する
+  /// (Issue #2)。ネットワークI/Oを伴うため、取得完了までは[isLoadingLine]、
+  /// 失敗時は[lineError]で画面側に伝える。
+  Future<void> selectDeparture(Station station) async {
+    state = GachaFormState(
+      departure: station,
+      minStops: state.minStops,
+      maxStops: state.maxStops,
+      direction: state.direction,
+      isLoadingLine: true,
+    );
+    RailwayLine? line;
+    String? error;
+    try {
+      line = await ref
+          .read(stationRepositoryProvider)
+          .findLineForStation(station);
+      if (line == null) error = '路線情報を取得できませんでした';
+    } on Exception catch (e) {
+      error = '路線情報の取得に失敗しました: $e';
+    }
+
+    // awaitの間にユーザーが別の駅を選び直していたら、この結果は古いので捨てる。
+    if (state.departure?.id != station.id) return;
+
     final maxSelectable = line == null
         ? kMaxSelectableStops
         : (line.stations.length - 1).clamp(0, kMaxSelectableStops);
@@ -71,11 +102,13 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
         ? maxSelectable
         : state.maxStops;
     final newMin = state.minStops > newMax ? newMax : state.minStops;
-    state = state.copyWith(
+    state = GachaFormState(
       departure: station,
       line: line,
       minStops: newMin,
       maxStops: newMax,
+      direction: state.direction,
+      lineError: error,
     );
   }
 
