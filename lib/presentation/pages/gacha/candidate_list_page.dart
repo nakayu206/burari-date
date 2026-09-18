@@ -39,7 +39,7 @@ class _CandidateListPageState extends ConsumerState<CandidateListPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('候補一覧'),
+        title: const Text('おでかけスポット'),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
