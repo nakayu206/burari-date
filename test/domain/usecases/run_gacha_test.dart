@@ -69,4 +69,61 @@ void main() {
       expect(result.direction, isNot(GachaDirection.random));
     });
   });
+
+  group('RunGacha 環状路線(isCircular)', () {
+    final circularLine = RailwayLine(
+      id: 'line_loop',
+      name: '環状線',
+      isCircular: true,
+      stations: const [
+        Station(id: 'c0', name: '0駅', lineId: 'line_loop', orderIndex: 0),
+        Station(id: 'c1', name: '1駅', lineId: 'line_loop', orderIndex: 1),
+        Station(id: 'c2', name: '2駅', lineId: 'line_loop', orderIndex: 2),
+        Station(id: 'c3', name: '3駅', lineId: 'line_loop', orderIndex: 3),
+        Station(id: 'c4', name: '4駅', lineId: 'line_loop', orderIndex: 4),
+      ],
+    );
+
+    test('up方向で終点を超える駅数指定でも、先頭側に折り返して到達できる', () {
+      // 出発駅3から3駅隣(up)は、直線扱いなら終点(4)で打ち切られるが、
+      // 環状路線なら3→4→0→1と進み、到着は1駅(index 1)になるはず。
+      final result = RunGacha()(
+        departure: circularLine.stations[3],
+        line: circularLine,
+        minStops: 3,
+        maxStops: 3,
+        direction: GachaDirection.up,
+      );
+
+      expect(result.stopsCount, 3);
+      expect(result.arrivalStation, circularLine.stations[1]);
+    });
+
+    test('down方向で起点を超える駅数指定でも、終点側に折り返して到達できる', () {
+      // 出発駅1から3駅隣(down)は、直線扱いなら起点(0)で打ち切られるが、
+      // 環状路線なら1→0→4→3と進み、到着は3駅(index 3)になるはず。
+      final result = RunGacha()(
+        departure: circularLine.stations[1],
+        line: circularLine,
+        minStops: 3,
+        maxStops: 3,
+        direction: GachaDirection.down,
+      );
+
+      expect(result.stopsCount, 3);
+      expect(result.arrivalStation, circularLine.stations[3]);
+    });
+
+    test('駅数の総数以上は指定しても一周分(駅数-1)で頭打ちになる', () {
+      final result = RunGacha()(
+        departure: circularLine.stations[0],
+        line: circularLine,
+        minStops: 10,
+        maxStops: 20,
+        direction: GachaDirection.up,
+      );
+
+      expect(result.stopsCount, circularLine.stations.length - 1);
+    });
+  });
 }

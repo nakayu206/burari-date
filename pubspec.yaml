@@ -40,6 +40,7 @@ dependencies:
 
   # 状態管理(社内標準。docs/コード規約.md 参照)
   flutter_riverpod: ^2.6.1
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

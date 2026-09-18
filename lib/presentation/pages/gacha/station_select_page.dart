@@ -17,7 +17,7 @@ class StationSelectPage extends ConsumerWidget {
   Future<void> _pickDeparture(BuildContext context, WidgetRef ref) async {
     final station = await showStationSearchSheet(context);
     if (station == null) return;
-    ref.read(gachaFormProvider.notifier).selectDeparture(station);
+    await ref.read(gachaFormProvider.notifier).selectDeparture(station);
   }
 
   void _startGacha(BuildContext context, WidgetRef ref) {
@@ -58,7 +58,11 @@ class StationSelectPage extends ConsumerWidget {
               const SizedBox(height: 6),
               _SelectField(
                 label: formState.departure?.name ?? '駅名を入力(サジェスト表示)',
-                onTap: () => _pickDeparture(context, ref),
+                // 路線データ取得中に別の駅を選び直すと余分なリクエストが飛ぶため
+                // (通し番号で結果は正しく捌けるが)、待機中はタップを止める。
+                onTap: formState.isLoadingLine
+                    ? null
+                    : () => _pickDeparture(context, ref),
               ),
               const SizedBox(height: AppSpacing.lg),
               const Text(
@@ -70,11 +74,23 @@ class StationSelectPage extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               _SelectField(
-                label: line?.name ?? '路線を選択',
-                onTap: formState.departure == null
+                label: formState.isLoadingLine
+                    ? '路線データを取得中…'
+                    : (line?.name ?? '路線を選択'),
+                onTap: formState.departure == null || formState.isLoadingLine
                     ? null
                     : () => _pickDeparture(context, ref),
               ),
+              if (formState.lineError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  formState.lineError!,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: AppFontSizes.footnote,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
               Text(
                 '駅数範囲: ${formState.minStops}〜${formState.maxStops}駅隣',
