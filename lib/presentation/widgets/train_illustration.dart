@@ -59,7 +59,10 @@ class _TrainPainter extends CustomPainter {
       ..lineTo(150, 196);
     canvas.drawPath(pantoPath, pantoPaint);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(126, 192, 48, 4), const Radius.circular(2)),
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(126, 192, 48, 4),
+        const Radius.circular(2),
+      ),
       Paint()..color = _ink,
     );
 
@@ -104,13 +107,22 @@ class _TrainPainter extends CustomPainter {
     canvas.drawRRect(car2Body, bodyGradient);
     canvas.drawRRect(car2Body, strokePaint);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(-10, 236, 160, 18), const Radius.circular(10)),
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-10, 236, 160, 18),
+        const Radius.circular(10),
+      ),
       roofGradient,
     );
-    canvas.drawRect(const Rect.fromLTWH(-10, 322, 160, 10), Paint()..color = const Color(0xFF241A10));
+    canvas.drawRect(
+      const Rect.fromLTWH(-10, 322, 160, 10),
+      Paint()..color = const Color(0xFF241A10),
+    );
 
     for (final x in [4.0, 40.0, 76.0, 112.0]) {
-      final winRect = RRect.fromRectAndRadius(Rect.fromLTWH(x, 262, 30, 28), const Radius.circular(4));
+      final winRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, 262, 30, 28),
+        const Radius.circular(4),
+      );
       canvas.drawRRect(winRect, glassGradient);
       canvas.drawRRect(winRect, thinStroke);
       canvas.drawLine(Offset(x + 15, 262), Offset(x + 15, 290), mullion);
@@ -123,10 +135,17 @@ class _TrainPainter extends CustomPainter {
     );
 
     // --- 連結部(蛇腹) ---
-    canvas.drawRect(const Rect.fromLTWH(148, 256, 16, 66), Paint()..color = const Color(0xFF3A342C));
+    canvas.drawRect(
+      const Rect.fromLTWH(148, 256, 16, 66),
+      Paint()..color = const Color(0xFF3A342C),
+    );
     canvas.drawRect(const Rect.fromLTWH(148, 256, 16, 66), thinStroke);
     for (final x in [151.0, 156.0, 161.0]) {
-      canvas.drawLine(Offset(x, 256), Offset(x, 322), Paint()..color = const Color(0xFF1B1B1B));
+      canvas.drawLine(
+        Offset(x, 256),
+        Offset(x, 322),
+        Paint()..color = const Color(0xFF1B1B1B),
+      );
     }
 
     // --- 前方車両(先頭車、鼻先あり) ---
@@ -151,10 +170,16 @@ class _TrainPainter extends CustomPainter {
     canvas.drawPath(roof1Path, roofGradient);
     canvas.drawPath(roof1Path, thinStroke);
 
-    canvas.drawRect(const Rect.fromLTWH(164, 322, 142, 10), Paint()..color = const Color(0xFF241A10));
+    canvas.drawRect(
+      const Rect.fromLTWH(164, 322, 142, 10),
+      Paint()..color = const Color(0xFF241A10),
+    );
 
     for (final x in [182.0, 220.0]) {
-      final winRect = RRect.fromRectAndRadius(Rect.fromLTWH(x, 262, 34, 28), const Radius.circular(4));
+      final winRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, 262, 34, 28),
+        const Radius.circular(4),
+      );
       canvas.drawRRect(winRect, glassGradient);
       canvas.drawRRect(winRect, thinStroke);
       canvas.drawLine(Offset(x + 17, 262), Offset(x + 17, 290), mullion);
@@ -180,7 +205,11 @@ class _TrainPainter extends CustomPainter {
     );
 
     // ヘッドライト
-    canvas.drawCircle(const Offset(296, 304), 14, Paint()..color = _headlight.withValues(alpha: 0.5));
+    canvas.drawCircle(
+      const Offset(296, 304),
+      14,
+      Paint()..color = _headlight.withValues(alpha: 0.5),
+    );
     canvas.drawCircle(const Offset(296, 304), 6, Paint()..color = _headlight);
     canvas.drawCircle(const Offset(296, 304), 6, thinStroke);
     canvas.drawCircle(const Offset(278, 308), 4, Paint()..color = _bodyMid);
@@ -198,7 +227,10 @@ class _TrainPainter extends CustomPainter {
       Paint()..color = _roofLight.withValues(alpha: 0.85),
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(300, 312, 10, 8), const Radius.circular(2)),
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(300, 312, 10, 8),
+        const Radius.circular(2),
+      ),
       Paint()..color = _ink,
     );
 

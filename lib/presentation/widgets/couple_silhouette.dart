@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 /// 「デート」らしさを添えるための装飾パーツ(ユーザーフィードバック:
 /// 「デートがメインだから電車とデート感も入れたい」)。
 class CoupleSilhouette extends StatelessWidget {
-  const CoupleSilhouette({super.key, this.width = 34, this.color = const Color(0xFF3F6B4C)});
+  const CoupleSilhouette({
+    super.key,
+    this.width = 34,
+    this.color = const Color(0xFF3F6B4C),
+  });
 
   final double width;
   final Color color;
@@ -51,7 +55,12 @@ class _CoupleSilhouettePainter extends CustomPainter {
       bodyHeight: h * 0.58,
     );
 
-    _drawHeart(canvas, Paint()..color = _heartColor, center: Offset(w * 0.5, h * 0.14), size: w * 0.22);
+    _drawHeart(
+      canvas,
+      Paint()..color = _heartColor,
+      center: Offset(w * 0.5, h * 0.14),
+      size: w * 0.22,
+    );
   }
 
   void _drawPerson(
@@ -76,7 +85,12 @@ class _CoupleSilhouettePainter extends CustomPainter {
     canvas.drawCircle(headCenter, headRadius, paint);
   }
 
-  void _drawHeart(Canvas canvas, Paint paint, {required Offset center, required double size}) {
+  void _drawHeart(
+    Canvas canvas,
+    Paint paint, {
+    required Offset center,
+    required double size,
+  }) {
     final path = Path()
       ..moveTo(center.dx, center.dy + size * 0.35)
       ..cubicTo(
@@ -100,5 +114,6 @@ class _CoupleSilhouettePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CoupleSilhouettePainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _CoupleSilhouettePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

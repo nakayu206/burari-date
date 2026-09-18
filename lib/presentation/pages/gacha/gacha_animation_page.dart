@@ -485,9 +485,10 @@ class _FlapCardState extends State<_FlapCard>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(vsync: this, duration: _kBlankFlipDuration)
-          ..addListener(_onTick);
+    _controller = AnimationController(
+      vsync: this,
+      duration: _kBlankFlipDuration,
+    )..addListener(_onTick);
     unawaited(_runSpins());
   }
 
@@ -565,7 +566,6 @@ class _FlapCardState extends State<_FlapCard>
     );
   }
 }
-
 
 /// 現在時刻から朝・昼・夕方・夜のどの時間帯かを判定する。
 enum _TimeBand { morning, day, evening, night }
@@ -731,8 +731,9 @@ class _SkySceneState extends State<_SkyScene> with TickerProviderStateMixin {
   late final AnimationController _sleepersScroll;
   late final AnimationController _hillsScroll;
   // 画面表示中に日をまたぐことはまず無いため、開いた時点の時刻で固定する。
-  late final _SkyPalette _palette =
-      _SkyPalette.forBand(_timeBandForHour(DateTime.now().hour));
+  late final _SkyPalette _palette = _SkyPalette.forBand(
+    _timeBandForHour(DateTime.now().hour),
+  );
 
   @override
   void initState() {
@@ -952,7 +953,10 @@ class _Hills extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _HillsPainter(phase, color), size: Size.infinite);
+    return CustomPaint(
+      painter: _HillsPainter(phase, color),
+      size: Size.infinite,
+    );
   }
 }
 
@@ -971,8 +975,7 @@ class _HillsPainter extends CustomPainter {
     final path = Path()..moveTo(0, size.height);
     for (var x = 0.0; x <= size.width; x += 4) {
       final y =
-          size.height * 0.4 -
-          _amplitude * sin((x / _period) * 2 * pi + phase);
+          size.height * 0.4 - _amplitude * sin((x / _period) * 2 * pi + phase);
       path.lineTo(x, y);
     }
     path

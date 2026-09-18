@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 /// 駅舎のシルエット(単色フラット)。電車イラストの背景に添える、控えめな
 /// 装飾用パーツ。三角屋根の駅舎本体+ホーム上家(片流れの庇)の簡易シルエット。
 class StationSilhouette extends StatelessWidget {
-  const StationSilhouette({super.key, this.width = 130, this.color = const Color(0xFF3F6B4C)});
+  const StationSilhouette({
+    super.key,
+    this.width = 130,
+    this.color = const Color(0xFF3F6B4C),
+  });
 
   final double width;
   final Color color;
@@ -47,13 +51,20 @@ class _StationPainter extends CustomPainter {
     final canopyLeft = 0.0;
     final canopyRight = bodyLeft + 4;
     final canopyTop = h * 0.5;
-    canvas.drawRect(Rect.fromLTRB(canopyLeft, canopyTop, canopyRight, canopyTop + h * 0.06), paint);
+    canvas.drawRect(
+      Rect.fromLTRB(canopyLeft, canopyTop, canopyRight, canopyTop + h * 0.06),
+      paint,
+    );
     for (var i = 0; i < canopyPoleCount; i++) {
       final x = canopyLeft + (canopyRight - canopyLeft) * (0.2 + i * 0.55);
-      canvas.drawRect(Rect.fromLTWH(x, canopyTop + h * 0.06, w * 0.02, h * 0.44), paint);
+      canvas.drawRect(
+        Rect.fromLTWH(x, canopyTop + h * 0.06, w * 0.02, h * 0.44),
+        paint,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _StationPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _StationPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
