@@ -33,9 +33,13 @@ class HeartRailsStationDataSource {
     return _toStations(rawList);
   }
 
-  /// 指定した路線名に属する全駅を、APIが返す並び順のまま取得する。
-  /// あわせて、始発・終着が隣接する環状路線(山手線・大阪環状線等)かどうかも
-  /// 判定して返す(RunGachaの隣接駅数計算で末端打ち切りにしないため)。
+  /// 指定した路線名に属する全駅を取得する。あわせて、始発・終着が隣接する
+  /// 環状路線(山手線・大阪環状線等)かどうかも判定して返す(RunGachaの
+  /// 隣接駅数計算で末端打ち切りにしないため)。
+  ///
+  /// APIが返す配列の並び順が実際の営業キロ順と一致する保証はないため、
+  /// 各駅のprev/nextフィールド(隣の駅名)を辿って並び順を組み立て直す
+  /// (CodeRabbit指摘: 配列順をそのまま信頼すべきではない)。
   Future<({List<Station> stations, bool isCircular})> fetchStationsForLine(
     String lineName,
   ) async {
@@ -43,15 +47,60 @@ class HeartRailsStationDataSource {
       queryParameters: {'method': 'getStations', 'line': lineName},
     );
     final rawList = await _fetchRawStations(uri);
-    return (stations: _toStations(rawList), isCircular: _isCircular(rawList));
+    final route = _deriveRouteOrder(rawList);
+    return (stations: _toStations(route.ordered), isCircular: route.isCircular);
   }
 
-  /// 配列末尾の駅のnextが先頭の駅名と一致する場合、環状路線と判定する。
-  bool _isCircular(List<Map<String, dynamic>> rawList) {
-    if (rawList.length < 3) return false;
-    final firstName = rawList.first['name'] as String;
-    final lastNext = rawList.last['next'] as String?;
-    return lastNext == firstName;
+  /// prev/nextのチェーンを辿って、実際の隣接順に駅を並べ替える。
+  /// 駅数2以下は「環状」と判定する意味が薄いため対象外とする。
+  /// prev/nextの整合が取れずチェーンを最後まで辿れなかった場合は、
+  /// (壊れたデータを誤って使うより安全な)APIの返した並び順にフォールバックし、
+  /// isCircularはfalse扱いにする。
+  ({List<Map<String, dynamic>> ordered, bool isCircular}) _deriveRouteOrder(
+    List<Map<String, dynamic>> rawList,
+  ) {
+    if (rawList.length < 3) return (ordered: rawList, isCircular: false);
+
+    final byName = <String, Map<String, dynamic>>{
+      for (final station in rawList) station['name'] as String: station,
+    };
+    // 駅名が重複していると安全に辿れないため、その場合も元の並びを使う。
+    if (byName.length != rawList.length) {
+      return (ordered: rawList, isCircular: false);
+    }
+
+    // prevがnullの駅(始発)があればそこから辿る。環状路線は全駅にprevが
+    // あるため見つからず、その場合は先頭要素から辿り始める。
+    final start = rawList.firstWhere(
+      (station) => station['prev'] == null,
+      orElse: () => rawList.first,
+    );
+
+    final ordered = <Map<String, dynamic>>[start];
+    final visited = <String>{start['name'] as String};
+    var current = start;
+    while (ordered.length < rawList.length) {
+      final nextName = current['next'] as String?;
+      // 終点に到達(直線路線)、または一周して始点に戻った(環状路線)。
+      // 環状かどうかは全駅を辿り終えたあとにlast['next']で判定するため、
+      // ここでは単にループを打ち切るだけでよい。
+      if (nextName == null || nextName == start['name']) break;
+      final next = byName[nextName];
+      if (next == null || visited.contains(nextName)) {
+        break; // prev/nextの整合が取れない、壊れたチェーン
+      }
+      ordered.add(next);
+      visited.add(nextName);
+      current = next;
+    }
+
+    if (ordered.length != rawList.length) {
+      return (ordered: rawList, isCircular: false);
+    }
+    // 全駅を辿り終えた後、最後の駅のnextが始点と一致するかで環状判定する
+    // (ループ途中で打ち切ると最後の駅のnextを確認できないため、ここで行う)。
+    final isCircular = ordered.last['next'] == start['name'];
+    return (ordered: ordered, isCircular: isCircular);
   }
 
   List<Station> _toStations(List<Map<String, dynamic>> rawList) {

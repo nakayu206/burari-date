@@ -58,11 +58,12 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
 
   void _onChanged(String value) {
     _debounce?.cancel();
+    // 通し番号はデバウンス発火時ではなく、入力が変わった時点で進める。
+    // でないと「Aで検索中(通信待ち)→デバウンス中にABへ変更」のケースで、
+    // Aの結果がABの表示中に届いても無効化できない
+    // (CodeRabbit指摘: search Aがデバウンス期間中に完了しうる)。
+    final requestId = ++_requestId;
     if (value.isEmpty) {
-      // _debounce.cancel()は「まだ発火していないタイマー」しか止められない。
-      // 既に発火して実行中の_searchがあれば、通し番号を進めて無効化する
-      // (でないと後から届いた古い検索結果でこの空表示が上書きされる)。
-      _requestId++;
       setState(() {
         _results = const [];
         _isSearching = false;
@@ -71,11 +72,10 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
       return;
     }
     setState(() => _isSearching = true);
-    _debounce = Timer(_debounceDuration, () => _search(value));
+    _debounce = Timer(_debounceDuration, () => _search(value, requestId));
   }
 
-  Future<void> _search(String query) async {
-    final requestId = ++_requestId;
+  Future<void> _search(String query, int requestId) async {
     final repository = ref.read(stationRepositoryProvider);
     List<Station> results;
     var hasError = false;
