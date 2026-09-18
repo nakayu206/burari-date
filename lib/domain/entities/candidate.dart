@@ -12,6 +12,8 @@ class Candidate {
     required this.walkMinutes,
     this.address,
     this.imageUrl,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -26,4 +28,9 @@ class Candidate {
   final int walkMinutes;
   final String? address;
   final String? imageUrl;
+
+  /// 店舗/観光地検索API接続(Issue #3)までは未設定。S-06の地図はnullの間、
+  /// 到着駅の座標をフォールバックとして表示する。
+  final double? latitude;
+  final double? longitude;
 }

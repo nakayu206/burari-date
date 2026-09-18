@@ -101,7 +101,10 @@ class _CandidateListTab extends ConsumerWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CandidateDetailPage(candidate: candidate),
+                builder: (_) => CandidateDetailPage(
+                  candidate: candidate,
+                  fallbackStation: result.arrivalStation,
+                ),
               ),
             ),
             child: Container(
