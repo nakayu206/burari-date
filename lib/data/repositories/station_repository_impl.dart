@@ -10,9 +10,21 @@ class StationRepositoryImpl implements StationRepository {
   final HeartRailsStationDataSource _dataSource;
 
   @override
-  Future<List<Station>> searchStations(String query) {
-    if (query.isEmpty) return Future.value(const []);
-    return _dataSource.searchStationsByName(query);
+  Future<List<Station>> searchStations(String query) async {
+    if (query.isEmpty) return const [];
+    // 駅名一致と路線名一致を並行して検索し、まとめて返す
+    // (ユーザーフィードバック:「路線も検索できるようにしたい」)。
+    final results = await Future.wait([
+      _dataSource.searchStationsByName(query),
+      _dataSource.searchStationsByLine(query),
+    ]);
+    final byId = <String, Station>{};
+    for (final stations in results) {
+      for (final station in stations) {
+        byId[station.id] = station;
+      }
+    }
+    return byId.values.toList();
   }
 
   @override

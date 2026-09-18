@@ -149,22 +149,36 @@ class StationSelectPage extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               SegmentedButton<GachaDirection>(
+                // 幅を均等固定し、チェックアイコンや文字数で変わらないようにする。
+                expandedInsets: EdgeInsets.zero,
+                showSelectedIcon: false,
                 segments: [
                   ButtonSegment(
                     value: GachaDirection.up,
                     label: Text(
                       line == null ? '○○方面' : '${line.endTerminus.name}方面',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   ButtonSegment(
                     value: GachaDirection.down,
                     label: Text(
                       line == null ? '△△方面' : '${line.startTerminus.name}方面',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const ButtonSegment(
                     value: GachaDirection.random,
-                    label: Text('おまかせ'),
+                    label: Text(
+                      'おまかせ',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
                 selected: {formState.direction},

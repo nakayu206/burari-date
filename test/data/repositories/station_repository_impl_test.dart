@@ -24,6 +24,87 @@ void main() {
       expect(called, isFalse);
     });
 
+    test('searchStationsは駅名一致と路線名一致の両方をまとめて返す', () async {
+      final client = MockClient((request) async {
+        final name = request.url.queryParameters['name'];
+        final line = request.url.queryParameters['line'];
+        if (name == '山手線') {
+          // 駅名としては該当なし。
+          return http.Response('{"response": {"error": "not found"}}', 200);
+        }
+        if (line == 'JR山手線') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "品川", "line": "JR山手線", "x": 0, "y": 0},
+                  {"name": "新宿", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final repository = StationRepositoryImpl(
+        dataSource: HeartRailsStationDataSource(client: client),
+      );
+
+      final result = await repository.searchStations('山手線');
+
+      expect(result.map((s) => s.name), containsAll(['品川駅', '新宿駅']));
+    });
+
+    test('searchStationsは駅名一致と路線名一致で同じ駅が重複した場合1件にまとめる', () async {
+      final client = MockClient((request) async {
+        final name = request.url.queryParameters['name'];
+        final line = request.url.queryParameters['line'];
+        if (name == '新宿') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "新宿", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        if (line == 'JR新宿') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "新宿", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final repository = StationRepositoryImpl(
+        dataSource: HeartRailsStationDataSource(client: client),
+      );
+
+      final result = await repository.searchStations('新宿');
+
+      expect(result, hasLength(1));
+      expect(result.single.name, '新宿駅');
+    });
+
     test('findLineForStationは取得した駅一覧からRailwayLineを組み立てる', () async {
       final client = MockClient((request) async {
         return http.Response(

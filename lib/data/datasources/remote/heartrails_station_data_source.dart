@@ -33,6 +33,55 @@ class HeartRailsStationDataSource {
     return _toStations(rawList);
   }
 
+  /// HeartRails Expressの主な事業者名(路線検索は完全一致のみで、
+  /// 「山手線」だけでは「JR山手線」にヒットしないため自動的に補う)。
+  static const _commonOperatorPrefixes = [
+    'JR',
+    '東京メトロ',
+    '都営',
+    '東急',
+    '小田急',
+    '京王',
+    '西武',
+    '東武',
+    '京急',
+    '京成',
+  ];
+
+  /// 路線名で駅を検索する(S-02b)。HeartRails Expressの路線検索は事業者名
+  /// 込みの完全一致のみ対応のため、入力そのものに加えて主要事業者接頭辞を
+  /// 付けた候補も試す(「山手線」→「JR山手線」等)。いずれかにヒットした
+  /// 路線の全駅を返す。
+  Future<List<Station>> searchStationsByLine(String query) async {
+    if (query.isEmpty) return const [];
+    final candidates = <String>{
+      query,
+      for (final prefix in _commonOperatorPrefixes) '$prefix$query',
+    };
+    final results = await Future.wait([
+      for (final candidate in candidates) _searchExactLine(candidate),
+    ]);
+    for (final stations in results) {
+      if (stations.isNotEmpty) return stations;
+    }
+    return const [];
+  }
+
+  /// 候補1件分の完全一致検索。通信エラー等は「この候補はヒットしなかった」
+  /// として扱う(他の候補やsearchStationsByNameが実際の通信断を拾うため、
+  /// ここで例外を投げて全体を失敗させる必要はない)。
+  Future<List<Station>> _searchExactLine(String lineName) async {
+    try {
+      final uri = _baseUri.replace(
+        queryParameters: {'method': 'getStations', 'line': lineName},
+      );
+      final rawList = await _fetchRawStations(uri);
+      return _toStations(rawList);
+    } on HeartRailsException {
+      return const [];
+    }
+  }
+
   /// 指定した路線名に属する全駅を取得する。あわせて、始発・終着が隣接する
   /// 環状路線(山手線・大阪環状線等)かどうかも判定して返す(RunGachaの
   /// 隣接駅数計算で末端打ち切りにしないため)。
