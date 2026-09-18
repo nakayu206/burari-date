@@ -235,6 +235,136 @@ void main() {
       expect(result.isCircular, isFalse);
     });
   });
+
+  group('HeartRailsStationDataSource.searchStationsByLine', () {
+    test('事業者名を省略して入力しても、主要事業者接頭辞を補って一致させる', () async {
+      final requestedLines = <String>[];
+      final client = MockClient((request) async {
+        final line = request.url.queryParameters['line']!;
+        requestedLines.add(line);
+        if (line == 'JR山手線') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "品川", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('山手線');
+
+      expect(stations, hasLength(1));
+      expect(stations.single.lineId, 'JR山手線');
+      // 「JR」を補った候補が試されたことを確認する。
+      expect(requestedLines, contains('JR山手線'));
+    });
+
+    test('事業者名込みで完全一致する入力ならそのまま使う', () async {
+      final client = MockClient((request) async {
+        final line = request.url.queryParameters['line'];
+        if (line == '東京メトロ丸ノ内線') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "池袋", "line": "東京メトロ丸ノ内線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('東京メトロ丸ノ内線');
+
+      expect(stations, hasLength(1));
+      expect(stations.single.lineId, '東京メトロ丸ノ内線');
+    });
+
+    test('どの候補にもヒットしない場合は空リストを返す', () async {
+      final client = MockClient((request) async {
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('存在しない路線');
+
+      expect(stations, isEmpty);
+    });
+
+    test('空文字列の場合はAPIを呼ばず空リストを返す', () async {
+      var called = false;
+      final client = MockClient((request) async {
+        called = true;
+        return http.Response('{"response": {}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('');
+
+      expect(stations, isEmpty);
+      expect(called, isFalse);
+    });
+
+    test('全候補が通信エラーだった場合は「該当なし」ではなく例外を投げる', () async {
+      final client = MockClient((request) async {
+        return http.Response('error', 500);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      expect(
+        () => dataSource.searchStationsByLine('山手線'),
+        throwsA(isA<HeartRailsException>()),
+      );
+    });
+
+    test('一部の候補がエラーでも、別の候補がヒットすればその結果を返す', () async {
+      final client = MockClient((request) async {
+        final line = request.url.queryParameters['line'];
+        if (line == 'JR山手線') {
+          return http.Response(
+            '''
+            {
+              "response": {
+                "station": [
+                  {"name": "品川", "line": "JR山手線", "x": 0, "y": 0}
+                ]
+              }
+            }
+            ''',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        if (line == '都営山手線') {
+          return http.Response('error', 500);
+        }
+        return http.Response('{"response": {"error": "not found"}}', 200);
+      });
+      final dataSource = HeartRailsStationDataSource(client: client);
+
+      final stations = await dataSource.searchStationsByLine('山手線');
+
+      expect(stations, isNotEmpty);
+      expect(stations.first.lineId, 'JR山手線');
+    });
+  });
 }
 
 /// https://express.heartrails.com/api/json?method=getStations&line=JR山手線

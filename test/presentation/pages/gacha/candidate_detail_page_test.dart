@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:burari_date/domain/entities/candidate.dart';
@@ -8,6 +10,10 @@ import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_detail_page.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('CandidateDetailPage', () {
     const candidateWithoutLocation = Candidate(
       id: 'c1',
@@ -20,10 +26,13 @@ void main() {
 
     testWidgets('候補にも到着駅にも座標が無い場合は地図の代わりにプレースホルダーを表示する', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CandidateDetailPage(candidate: candidateWithoutLocation),
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(candidate: candidateWithoutLocation),
+          ),
         ),
       );
+      await tester.pump();
 
       expect(find.byType(FlutterMap), findsNothing);
       expect(find.byIcon(Icons.map_rounded), findsOneWidget);
@@ -41,13 +50,16 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithoutLocation,
-            fallbackStation: station,
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithoutLocation,
+              fallbackStation: station,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       expect(find.byType(FlutterMap), findsOneWidget);
       expect(find.byType(MarkerLayer), findsOneWidget);
@@ -75,13 +87,16 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithLocation,
-            fallbackStation: station,
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithLocation,
+              fallbackStation: station,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
       expect(map.options.initialCenter.latitude, 35.0);
@@ -99,13 +114,16 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithoutLocation,
-            fallbackStation: station,
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithoutLocation,
+              fallbackStation: station,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       expect(find.byTooltip('テスト洋食屋'), findsOneWidget);
     });
@@ -121,15 +139,18 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithoutLocation,
-            fallbackStation: station,
-            launchUrlOverride:
-                (uri, {mode = LaunchMode.platformDefault}) async => false,
+        ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithoutLocation,
+              fallbackStation: station,
+              launchUrlOverride:
+                  (uri, {mode = LaunchMode.platformDefault}) async => false,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       await tester.tap(find.text('経路案内を開く'));
       await tester.pumpAndSettle();
@@ -153,15 +174,18 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithoutLocation,
-            fallbackStation: station,
-            launchUrlOverride:
-                (uri, {mode = LaunchMode.platformDefault}) async => true,
+        ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithoutLocation,
+              fallbackStation: station,
+              launchUrlOverride:
+                  (uri, {mode = LaunchMode.platformDefault}) async => true,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       await tester.tap(find.text('経路案内を開く'));
       await tester.pumpAndSettle();
@@ -181,18 +205,21 @@ void main() {
       Uri? capturedUri;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidateWithoutLocation,
-            fallbackStation: station,
-            launchUrlOverride:
-                (uri, {mode = LaunchMode.platformDefault}) async {
-                  capturedUri = uri;
-                  return true;
-                },
+        ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidateWithoutLocation,
+              fallbackStation: station,
+              launchUrlOverride:
+                  (uri, {mode = LaunchMode.platformDefault}) async {
+                    capturedUri = uri;
+                    return true;
+                  },
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       await tester.tap(find.text('経路案内を開く'));
       await tester.pumpAndSettle();
@@ -223,19 +250,47 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CandidateDetailPage(
-            candidate: candidatePartialLocation,
-            fallbackStation: station,
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(
+              candidate: candidatePartialLocation,
+              fallbackStation: station,
+            ),
           ),
         ),
       );
+      await tester.pump();
 
       // 候補側の緯度(10.0)と駅側の経度(139.70)を組み合わせず、
       // 駅の座標をまるごとフォールバックとして使う。
       final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
       expect(map.options.initialCenter.latitude, 35.69);
       expect(map.options.initialCenter.longitude, 139.70);
+    });
+
+    testWidgets('保存する→保存済みに切り替わり、再度タップすると解除できる', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(candidate: candidateWithoutLocation),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('保存する'), findsOneWidget);
+
+      await tester.tap(find.text('保存する'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('保存済み(解除する)'), findsOneWidget);
+      expect(find.text('お気に入りに保存しました'), findsOneWidget);
+
+      await tester.tap(find.text('保存済み(解除する)'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('保存する'), findsOneWidget);
+      expect(find.text('お気に入りを解除しました'), findsOneWidget);
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,14 +8,16 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
+import '../../../domain/entities/favorite.dart';
 import '../../../domain/entities/station.dart';
+import '../../providers/favorite_providers.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
 /// テストでは実プラットフォーム呼び出し(ブラウザ起動等)を避けるため差し替える。
 typedef UrlLauncher = Future<bool> Function(Uri url, {LaunchMode mode});
 
 /// S-06 候補詳細画面
-class CandidateDetailPage extends StatelessWidget {
+class CandidateDetailPage extends ConsumerWidget {
   const CandidateDetailPage({
     super.key,
     required this.candidate,
@@ -48,8 +51,9 @@ class CandidateDetailPage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = _location;
+    final isFavoriteAsync = ref.watch(isFavoriteProvider(candidate.id));
 
     return Scaffold(
       appBar: AppBar(title: const Text('候補詳細')),
@@ -121,13 +125,32 @@ class CandidateDetailPage extends StatelessWidget {
                 label: const Text('経路案内を開く'),
               ),
             const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('お気に入りに保存しました')));
-              },
-              child: const Text('保存する'),
+            isFavoriteAsync.when(
+              loading: () => const ElevatedButton(
+                onPressed: null,
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              // 取得に失敗しても未保存扱いで表示し、ボタン操作自体は続行できる
+              // ようにする(受動的なロード失敗は画面内表示でよい)。
+              error: (_, _) => ElevatedButton(
+                onPressed: () => _toggleFavorite(context, ref, isSaved: false),
+                child: const Text('保存する'),
+              ),
+              data: (isSaved) => ElevatedButton(
+                onPressed: () =>
+                    _toggleFavorite(context, ref, isSaved: isSaved),
+                style: isSaved
+                    ? ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryLight,
+                        foregroundColor: AppColors.primary,
+                      )
+                    : null,
+                child: Text(isSaved ? '保存済み(解除する)' : '保存する'),
+              ),
             ),
           ],
         ),
@@ -165,6 +188,35 @@ class CandidateDetailPage extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Future<void> _toggleFavorite(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isSaved,
+  }) async {
+    // ウィジェットが破棄されてもキャッシュ更新は行いたいので、refではなく
+    // 破棄されないcontainer経由でinvalidateする(refはウィジェットと運命を共にする)。
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(favoriteRepositoryProvider);
+    String message;
+    try {
+      if (isSaved) {
+        await repository.removeFavorite(candidate.id);
+        message = 'お気に入りを解除しました';
+      } else {
+        await repository.addFavorite(Favorite.fromCandidate(candidate));
+        message = 'お気に入りに保存しました';
+      }
+      container.invalidate(isFavoriteProvider(candidate.id));
+      container.invalidate(favoritesProvider);
+    } on Exception {
+      message = isSaved ? '解除に失敗しました' : '保存に失敗しました';
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars() // 連打時に古いSnackBarが表示待ちで詰まらないようにする。
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

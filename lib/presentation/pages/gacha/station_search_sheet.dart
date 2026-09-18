@@ -142,7 +142,7 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                     decoration: const InputDecoration(
                       isCollapsed: true,
                       border: InputBorder.none,
-                      hintText: '駅名を入力',
+                      hintText: '駅名・路線名を入力',
                     ),
                   ),
                 ),
