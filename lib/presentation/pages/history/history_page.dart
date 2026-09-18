@@ -24,7 +24,9 @@ class HistoryPage extends ConsumerWidget {
         child: history.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           // 受動的なロード失敗は画面内表示でよい(docs/コード規約.md)。
-          error: (_, _) => const _HistoryLoadError(),
+          error: (_, _) => _HistoryLoadError(
+            onRetry: () => ref.invalidate(gachaHistoryProvider),
+          ),
           data: (entries) => entries.isEmpty
               ? const _EmptyHistory()
               : ListView.separated(
@@ -103,19 +105,28 @@ class _HistoryRow extends StatelessWidget {
 }
 
 class _HistoryLoadError extends StatelessWidget {
-  const _HistoryLoadError();
+  const _HistoryLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(AppSpacing.x2l),
-        child: Text(
-          '履歴を読み込めませんでした',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: AppFontSizes.bodyMedium,
-          ),
+        padding: const EdgeInsets.all(AppSpacing.x2l),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '履歴を読み込めませんでした',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: AppFontSizes.bodyMedium,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(onPressed: onRetry, child: const Text('再読み込み')),
+          ],
         ),
       ),
     );

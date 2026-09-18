@@ -80,7 +80,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('読み込みに失敗した場合はエラーメッセージを画面内表示する', (tester) async {
+    testWidgets('読み込みに失敗した場合はエラーメッセージと再読み込みボタンを画面内表示する', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -94,6 +94,33 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('履歴を読み込めませんでした'), findsOneWidget);
+      expect(find.text('再読み込み'), findsOneWidget);
+    });
+
+    testWidgets('再読み込みボタンをタップすると履歴の取得をやり直す', (tester) async {
+      var attempt = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            gachaHistoryProvider.overrideWith((ref) {
+              attempt++;
+              if (attempt == 1) {
+                return Future<List<GachaHistoryEntry>>.error('boom');
+              }
+              return Future.value(const []);
+            }),
+          ],
+          child: const MaterialApp(home: HistoryPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('履歴を読み込めませんでした'), findsOneWidget);
+
+      await tester.tap(find.text('再読み込み'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('履歴を読み込めませんでした'), findsNothing);
+      expect(find.text('まだガチャの履歴がありません'), findsOneWidget);
     });
   });
 }
