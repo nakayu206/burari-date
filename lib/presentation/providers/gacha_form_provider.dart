@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/gacha_history_entry.dart';
 import '../../domain/entities/gacha_result.dart';
 import '../../domain/entities/railway_line.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/usecases/run_gacha.dart';
+import 'gacha_history_providers.dart';
 import 'station_providers.dart';
 
 /// スライダー/ステッパーで選択できる駅数範囲の実用上限。
@@ -169,12 +173,29 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
       departure != null && line != null,
       'departure/line must be selected',
     );
-    return RunGacha()(
+    final result = RunGacha()(
       departure: departure!,
       line: line!,
       minStops: state.minStops,
       maxStops: state.maxStops,
       direction: state.direction,
+    );
+    _saveToHistory(result);
+    return result;
+  }
+
+  /// 履歴への保存はガチャ演出をブロックしない(結果はもう確定しているため、
+  /// 保存の成否に関わらずそのままアニメーションへ進んでよい)。保存に失敗
+  /// しても、次にこの駅ガチャを実行した際にまた保存を試みるだけなので、
+  /// ここではダイアログ等でユーザーに通知せず静かに諦める。
+  void _saveToHistory(GachaResult result) {
+    final entry = GachaHistoryEntry.fromGachaResult(result);
+    unawaited(
+      ref
+          .read(gachaHistoryRepositoryProvider)
+          .addEntry(entry)
+          .then((_) => ref.invalidate(gachaHistoryProvider))
+          .catchError((_) {}),
     );
   }
 }

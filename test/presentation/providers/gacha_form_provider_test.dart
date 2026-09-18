@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:burari_date/domain/entities/gacha_history_entry.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/domain/entities/station.dart';
+import 'package:burari_date/domain/repositories/gacha_history_repository.dart';
 import 'package:burari_date/domain/repositories/station_repository.dart';
 import 'package:burari_date/presentation/providers/gacha_form_provider.dart';
+import 'package:burari_date/presentation/providers/gacha_history_providers.dart';
 import 'package:burari_date/presentation/providers/station_providers.dart';
 
 /// テスト用のフェイクリポジトリ。findLineForStationの完了タイミングと結果を
@@ -23,6 +26,33 @@ class _FakeStationRepository implements StationRepository {
     pendingFindLine = completer;
     return completer.future;
   }
+}
+
+/// 即座に路線を返すフェイク(runGachaのテスト用に、selectDepartureを
+/// 待たずに有効な路線状態を作るために使う)。
+class _ImmediateStationRepository implements StationRepository {
+  const _ImmediateStationRepository(this.line);
+
+  final RailwayLine line;
+
+  @override
+  Future<List<Station>> searchStations(String query) async => const [];
+
+  @override
+  Future<RailwayLine?> findLineForStation(Station station) async => line;
+}
+
+/// runGacha実行時に履歴保存が呼ばれることを検証するためのフェイク。
+class _FakeGachaHistoryRepository implements GachaHistoryRepository {
+  final List<GachaHistoryEntry> savedEntries = [];
+
+  @override
+  Future<void> addEntry(GachaHistoryEntry entry) async {
+    savedEntries.add(entry);
+  }
+
+  @override
+  Future<List<GachaHistoryEntry>> loadHistory() async => savedEntries;
 }
 
 void main() {
@@ -131,6 +161,52 @@ void main() {
         container.read(gachaFormProvider).lineError,
         isNotNull,
         reason: 'copyWithがlineErrorを保持できていない可能性がある',
+      );
+    });
+  });
+
+  group('GachaFormNotifier runGacha の履歴保存', () {
+    test('runGachaを実行すると結果が履歴リポジトリに保存される', () async {
+      const departure = Station(
+        id: 's1',
+        name: '中野駅',
+        lineId: 'l1',
+        orderIndex: 0,
+      );
+      const arrival = Station(
+        id: 's2',
+        name: '新宿駅',
+        lineId: 'l1',
+        orderIndex: 3,
+      );
+      const line = RailwayLine(
+        id: 'l1',
+        name: '中央線',
+        stations: [departure, arrival, arrival, arrival],
+      );
+      final fakeHistoryRepository = _FakeGachaHistoryRepository();
+      final container = ProviderContainer(
+        overrides: [
+          stationRepositoryProvider.overrideWithValue(
+            const _ImmediateStationRepository(line),
+          ),
+          gachaHistoryRepositoryProvider.overrideWithValue(
+            fakeHistoryRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(gachaFormProvider.notifier);
+      await notifier.selectDeparture(departure);
+
+      notifier.runGacha();
+      // _saveToHistoryはfire-and-forgetなので、完了を待つ猶予を与える。
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeHistoryRepository.savedEntries, hasLength(1));
+      expect(
+        fakeHistoryRepository.savedEntries.single.departureStationName,
+        '中野駅',
       );
     });
   });
