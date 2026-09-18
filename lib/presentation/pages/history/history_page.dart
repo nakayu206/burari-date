@@ -1,87 +1,133 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
+import '../../../domain/entities/gacha_history_entry.dart';
+import '../../../domain/entities/railway_line.dart';
+import '../../providers/gacha_history_providers.dart';
 import '../../widgets/app_bottom_nav.dart';
 
-/// S-07 履歴画面
-///
-/// 仕様書 4.2 に記載の通り詳細は今後の拡張フェーズで検討中のプレースホルダー。
-/// 実装時は GachaHistory テーブル(仕様書 6.2)からの取得に置き換える。
-class HistoryPage extends StatelessWidget {
+/// S-07 履歴画面。GachaHistory(仕様書 6.2)を新しい順に一覧表示する。
+class HistoryPage extends ConsumerWidget {
   const HistoryPage({super.key});
 
-  static const _placeholderEntries = [
-    (station: '△△駅', summary: 'グルメ2件保存', date: '9/1'),
-    (station: '□□駅', summary: '観光1件保存', date: '8/24'),
-    (station: '◇◇駅', summary: '', date: '8/10'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(gachaHistoryProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('履歴')),
       body: SafeArea(
-        child: _placeholderEntries.isEmpty
-            ? const _EmptyHistory()
-            : ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.md,
+        child: history.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          // 受動的なロード失敗は画面内表示でよい(docs/コード規約.md)。
+          error: (_, _) => _HistoryLoadError(
+            onRetry: () => ref.invalidate(gachaHistoryProvider),
+          ),
+          data: (entries) => entries.isEmpty
+              ? const _EmptyHistory()
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                    vertical: AppSpacing.md,
+                  ),
+                  itemCount: entries.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.lg),
+                  itemBuilder: (context, index) =>
+                      _HistoryRow(entry: entries[index]),
                 ),
-                itemCount: _placeholderEntries.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.lg),
-                itemBuilder: (context, index) {
-                  final entry = _placeholderEntries[index];
-                  return Row(
-                    children: [
-                      const Icon(
-                        Icons.circle,
-                        size: 10,
-                        color: AppColors.secondary,
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              entry.station,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: AppFontSizes.bodyMedium,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (entry.summary.isNotEmpty)
-                              Text(
-                                entry.summary,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: AppFontSizes.caption,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        entry.date,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: AppFontSizes.caption,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+        ),
       ),
       bottomNavigationBar: const SafeArea(
         top: false,
         child: AppBottomNav(currentTab: AppTab.history),
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.entry});
+
+  final GachaHistoryEntry entry;
+
+  String get _directionLabel => switch (entry.direction) {
+    GachaDirection.up => 'up方面',
+    GachaDirection.down => 'down方面',
+    GachaDirection.random => 'おまかせ',
+  };
+
+  String get _formattedDate =>
+      '${entry.executedAt.month}/${entry.executedAt.day}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.circle, size: 10, color: AppColors.secondary),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.arrivalStationName,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: AppFontSizes.bodyMedium,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${entry.departureStationName}から${entry.stopsCount}駅隣($_directionLabel)',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.caption,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          _formattedDate,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: AppFontSizes.caption,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryLoadError extends StatelessWidget {
+  const _HistoryLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.x2l),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '履歴を読み込めませんでした',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: AppFontSizes.bodyMedium,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(onPressed: onRetry, child: const Text('再読み込み')),
+          ],
+        ),
       ),
     );
   }
