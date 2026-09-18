@@ -59,26 +59,14 @@ void main() {
       expect(result.map((s) => s.name), containsAll(['品川駅', '新宿駅']));
     });
 
-    test('searchStationsは駅名一致と路線名一致で同じ駅が重複した場合1件にまとめる', () async {
+    test('駅名一致が見つかった場合は、コストの高い路線名検索(最大11並列)を実行しない', () async {
+      var lineRequested = false;
       final client = MockClient((request) async {
-        final name = request.url.queryParameters['name'];
-        final line = request.url.queryParameters['line'];
-        if (name == '新宿') {
-          return http.Response(
-            '''
-            {
-              "response": {
-                "station": [
-                  {"name": "新宿", "line": "JR山手線", "x": 0, "y": 0}
-                ]
-              }
-            }
-            ''',
-            200,
-            headers: {'content-type': 'application/json; charset=utf-8'},
-          );
+        if (request.url.queryParameters.containsKey('line')) {
+          lineRequested = true;
         }
-        if (line == 'JR新宿') {
+        final name = request.url.queryParameters['name'];
+        if (name == '新宿') {
           return http.Response(
             '''
             {
@@ -103,6 +91,7 @@ void main() {
 
       expect(result, hasLength(1));
       expect(result.single.name, '新宿駅');
+      expect(lineRequested, isFalse);
     });
 
     test('findLineForStationは取得した駅一覧からRailwayLineを組み立てる', () async {

@@ -12,18 +12,17 @@ class StationRepositoryImpl implements StationRepository {
   @override
   Future<List<Station>> searchStations(String query) async {
     if (query.isEmpty) return const [];
-    // 駅名一致と路線名一致を並行して検索し、まとめて返す
-    // (ユーザーフィードバック:「路線も検索できるようにしたい」)。
-    final results = await Future.wait([
-      _dataSource.searchStationsByName(query),
-      _dataSource.searchStationsByLine(query),
-    ]);
-    final byId = <String, Station>{};
-    for (final stations in results) {
-      for (final station in stations) {
-        byId[station.id] = station;
-      }
-    }
+    // まず駅名一致を試す(リクエスト1本)。路線名検索は事業者接頭辞の候補分
+    // 最大11並列でリクエストするため、駅名一致で十分な結果が得られている
+    // 場合はコストの高い路線名検索を省略する(ユーザーフィードバック:
+    // 「路線も検索できるようにしたい」/CodeRabbit指摘: 毎回11並列は無駄)。
+    final nameResults = await _dataSource.searchStationsByName(query);
+    if (nameResults.isNotEmpty) return nameResults;
+
+    final lineResults = await _dataSource.searchStationsByLine(query);
+    final byId = <String, Station>{
+      for (final station in lineResults) station.id: station,
+    };
     return byId.values.toList();
   }
 

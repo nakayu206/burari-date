@@ -208,13 +208,14 @@ class CandidateDetailPage extends ConsumerWidget {
     } on Exception {
       message = isSaved ? '解除に失敗しました' : '保存に失敗しました';
     }
+    // awaitの間にウィジェットが破棄されているとrefの使用自体が例外になるため、
+    // invalidate呼び出しもmountedチェックの内側に入れる。
+    if (!context.mounted) return;
     ref.invalidate(isFavoriteProvider(candidate.id));
     ref.invalidate(favoritesProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars() // 連打時に古いSnackBarが表示待ちで詰まらないようにする。
-        ..showSnackBar(SnackBar(content: Text(message)));
-    }
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars() // 連打時に古いSnackBarが表示待ちで詰まらないようにする。
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

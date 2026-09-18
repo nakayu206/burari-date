@@ -6,8 +6,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/favorite.dart';
+import 'package:burari_date/domain/repositories/favorite_repository.dart';
 import 'package:burari_date/presentation/pages/favorite/favorite_list_page.dart';
 import 'package:burari_date/presentation/providers/favorite_providers.dart';
+
+/// 削除失敗時にエラー表示になることを検証するためのフェイク。
+class _FailingFavoriteRepository implements FavoriteRepository {
+  const _FailingFavoriteRepository(this._favorites);
+
+  final List<Favorite> _favorites;
+
+  @override
+  Future<List<Favorite>> loadFavorites() async => _favorites;
+
+  @override
+  Future<void> addFavorite(Favorite favorite) async {}
+
+  @override
+  Future<void> removeFavorite(String candidateId) {
+    throw Exception('boom');
+  }
+
+  @override
+  Future<bool> isFavorite(String candidateId) async =>
+      _favorites.any((f) => f.candidateId == candidateId);
+}
 
 void main() {
   setUp(() {
@@ -113,6 +136,36 @@ void main() {
 
       expect(find.text('お気に入りを読み込めませんでした'), findsOneWidget);
       expect(find.text('再読み込み'), findsOneWidget);
+    });
+
+    testWidgets('削除に失敗した場合はエラーをSnackBarで知らせ、行は残る', (tester) async {
+      final favorite = Favorite(
+        candidateId: 'c1',
+        category: CandidateCategory.gourmet,
+        name: 'テスト洋食屋',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 3,
+        savedAt: DateTime(2026, 9, 18),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoriteRepositoryProvider.overrideWithValue(
+              _FailingFavoriteRepository([favorite]),
+            ),
+          ],
+          child: const MaterialApp(home: FavoriteListPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('削除に失敗しました'), findsOneWidget);
+      expect(find.text('テスト洋食屋'), findsOneWidget);
     });
   });
 }

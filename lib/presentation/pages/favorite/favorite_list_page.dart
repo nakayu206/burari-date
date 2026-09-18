@@ -50,10 +50,21 @@ class _FavoriteRow extends ConsumerWidget {
 
   final Favorite favorite;
 
-  Future<void> _remove(WidgetRef ref) async {
-    await ref
-        .read(favoriteRepositoryProvider)
-        .removeFavorite(favorite.candidateId);
+  Future<void> _remove(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(favoriteRepositoryProvider)
+          .removeFavorite(favorite.candidateId);
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(const SnackBar(content: Text('削除に失敗しました')));
+      }
+      return;
+    }
+    // awaitの間にウィジェットが破棄されているとrefの使用自体が例外になる。
+    if (!context.mounted) return;
     ref.invalidate(favoritesProvider);
     ref.invalidate(isFavoriteProvider(favorite.candidateId));
   }
@@ -94,7 +105,7 @@ class _FavoriteRow extends ConsumerWidget {
           ),
         ),
         IconButton(
-          onPressed: () => _remove(ref),
+          onPressed: () => _remove(context, ref),
           icon: const Icon(Icons.delete_outline_rounded),
           color: AppColors.textSecondary,
           tooltip: 'お気に入りから削除',
