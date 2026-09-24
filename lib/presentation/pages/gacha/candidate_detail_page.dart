@@ -117,6 +117,10 @@ class CandidateDetailPage extends ConsumerWidget {
                 fontSize: AppFontSizes.labelSmall,
               ),
             ),
+            if (candidate.category == CandidateCategory.gourmet) ...[
+              const SizedBox(height: AppSpacing.xs),
+              const _HotPepperCredit(),
+            ],
             const SizedBox(height: AppSpacing.lg),
             if (location != null)
               OutlinedButton.icon(
@@ -269,6 +273,22 @@ class _CandidateMap extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// ホットペッパーグルメAPIの利用規約上の表示義務(Issue #50)。
+class _HotPepperCredit extends StatelessWidget {
+  const _HotPepperCredit();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      '情報提供: ホットペッパーグルメ',
+      style: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: AppFontSizes.caption,
       ),
     );
   }

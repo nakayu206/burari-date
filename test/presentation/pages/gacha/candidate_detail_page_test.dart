@@ -292,5 +292,40 @@ void main() {
       expect(find.text('保存する'), findsOneWidget);
       expect(find.text('お気に入りを解除しました'), findsOneWidget);
     });
+
+    testWidgets('グルメ候補はホットペッパーのクレジットを表示する', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(candidate: candidateWithoutLocation),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('情報提供: ホットペッパーグルメ'), findsOneWidget);
+    });
+
+    testWidgets('観光候補はホットペッパーのクレジットを表示しない', (tester) async {
+      const sightseeingCandidate = Candidate(
+        id: 'c4',
+        category: CandidateCategory.sightseeing,
+        name: 'テスト公園',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 4,
+      );
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: CandidateDetailPage(candidate: sightseeingCandidate),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('情報提供: ホットペッパーグルメ'), findsNothing);
+    });
   });
 }

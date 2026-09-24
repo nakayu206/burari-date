@@ -6,6 +6,7 @@ import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/gacha_result.dart';
+import '../../../domain/entities/station.dart';
 import '../../providers/candidate_providers.dart';
 import 'candidate_detail_page.dart';
 
@@ -91,85 +92,129 @@ class _CandidateListTab extends ConsumerWidget {
     return candidatesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('候補の取得に失敗しました: $error')),
-      data: (candidates) => ListView.separated(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        itemCount: candidates.length,
-        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.lg),
-        itemBuilder: (context, index) {
-          final candidate = candidates[index];
-          return InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => CandidateDetailPage(
-                  candidate: candidate,
-                  fallbackStation: result.arrivalStation,
-                ),
-              ),
+      data: (candidates) => Column(
+        children: [
+          Expanded(
+            child: _CandidateListView(
+              candidates: candidates,
+              arrivalStation: result.arrivalStation,
             ),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.secondary, width: 1.2),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      candidate.category == CandidateCategory.gourmet
-                          ? Icons.ramen_dining_rounded
-                          : Icons.park_rounded,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          candidate.name,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: AppFontSizes.bodyLarge,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'AI: ${candidate.catchCopy}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: AppFontSizes.labelSmall,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '駅から徒歩${candidate.walkMinutes}分',
-                          style: const TextStyle(
-                            color: AppColors.secondary,
-                            fontSize: AppFontSizes.caption,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+          ),
+          if (category == CandidateCategory.gourmet) const _HotPepperCredit(),
+        ],
       ),
+    );
+  }
+}
+
+/// ホットペッパーグルメAPIの利用規約上の表示義務(Issue #50)。
+class _HotPepperCredit extends StatelessWidget {
+  const _HotPepperCredit();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Text(
+        '情報提供: ホットペッパーグルメ',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: AppFontSizes.caption,
+        ),
+      ),
+    );
+  }
+}
+
+class _CandidateListView extends StatelessWidget {
+  const _CandidateListView({
+    required this.candidates,
+    required this.arrivalStation,
+  });
+
+  final List<Candidate> candidates;
+  final Station arrivalStation;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      itemCount: candidates.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.lg),
+      itemBuilder: (context, index) {
+        final candidate = candidates[index];
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CandidateDetailPage(
+                candidate: candidate,
+                fallbackStation: arrivalStation,
+              ),
+            ),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.secondary, width: 1.2),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    candidate.category == CandidateCategory.gourmet
+                        ? Icons.ramen_dining_rounded
+                        : Icons.park_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        candidate.name,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: AppFontSizes.bodyLarge,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'AI: ${candidate.catchCopy}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: AppFontSizes.labelSmall,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '駅から徒歩${candidate.walkMinutes}分',
+                        style: const TextStyle(
+                          color: AppColors.secondary,
+                          fontSize: AppFontSizes.caption,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
