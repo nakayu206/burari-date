@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "889357641434",
+    "project_id": "burari-date",
+    "storage_bucket": "burari-date.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889357641434:android:ab528f1a1e1336432d27e3",
+        "android_client_info": {
+          "package_name": "com.buraridate.burari_date"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
