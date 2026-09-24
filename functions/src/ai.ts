@@ -44,9 +44,22 @@ export async function generateCandidates(
     content?: { type: string; text?: string }[];
   };
   const text = body.content?.find((c) => c.type === "text")?.text ?? "[]";
-  const picks = parsePicks(text);
+  return toCandidates(parsePicks(text), targets, category);
+}
 
+/** AIの選出結果(pick)を実データと突き合わせ、重複除去・件数上限を適用してCandidateに変換する */
+export function toCandidates(
+  picks: Pick[],
+  targets: RawPlace[],
+  category: CandidateCategory,
+): Omit<Candidate, "walkMinutes">[] {
+  const seen = new Set<number>();
   return picks
+    .filter(({ index }) => {
+      if (seen.has(index)) return false;
+      seen.add(index);
+      return true;
+    })
     .map(({ index, catchCopy, reason }) => {
       const place = targets[index];
       if (!place) return null;
@@ -63,7 +76,8 @@ export async function generateCandidates(
       };
       return candidate;
     })
-    .filter((c): c is Omit<Candidate, "walkMinutes"> => c !== null);
+    .filter((c): c is Omit<Candidate, "walkMinutes"> => c !== null)
+    .slice(0, MAX_RESULTS);
 }
 
 function buildPrompt(

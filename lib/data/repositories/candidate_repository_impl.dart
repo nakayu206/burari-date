@@ -20,9 +20,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
   static Future<Map<String, dynamic>> _defaultCallable(
     Map<String, dynamic> data,
   ) async {
-    final callable = FirebaseFunctions.instance.httpsCallable(
-      'getCandidates',
-    );
+    final callable = FirebaseFunctions.instance.httpsCallable('getCandidates');
     final result = await callable.call<Map<String, dynamic>>(data);
     return result.data;
   }
