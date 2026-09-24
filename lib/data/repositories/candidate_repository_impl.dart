@@ -36,14 +36,20 @@ class CandidateRepositoryImpl implements CandidateRepository {
       throw Exception('到着駅の位置情報が取得できませんでした');
     }
 
-    final data = await _callable({
-      'latitude': latitude,
-      'longitude': longitude,
-      'stationName': arrival.name,
-      'category': category == CandidateCategory.gourmet
-          ? 'gourmet'
-          : 'sightseeing',
-    });
+    Map<String, dynamic> data;
+    try {
+      data = await _callable({
+        'latitude': latitude,
+        'longitude': longitude,
+        'stationName': arrival.name,
+        'category': category == CandidateCategory.gourmet
+            ? 'gourmet'
+            : 'sightseeing',
+      });
+    } on FirebaseFunctionsException catch (e) {
+      // バックエンドのエラーメッセージ(利用上限案内など)をそのまま表示する。
+      throw Exception(e.message ?? '候補の取得に失敗しました');
+    }
 
     final rawCandidates = data['candidates'] as List<dynamic>? ?? [];
     return rawCandidates
