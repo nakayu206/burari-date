@@ -6,7 +6,7 @@ import '../../domain/entities/gacha_result.dart';
 import '../../domain/repositories/candidate_repository.dart';
 
 final candidateRepositoryProvider = Provider<CandidateRepository>((ref) {
-  return const CandidateRepositoryImpl();
+  return CandidateRepositoryImpl();
 });
 
 /// S-05 候補一覧画面用。到着駅・カテゴリごとに候補を取得する。

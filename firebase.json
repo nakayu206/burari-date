@@ -1,1 +1,36 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"burari-date","appId":"1:889357641434:android:ab528f1a1e1336432d27e3","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"burari-date","configurations":{"android":"1:889357641434:android:ab528f1a1e1336432d27e3","ios":"1:889357641434:ios:b58cd38ba9138f612d27e3"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "burari-date",
+          "appId": "1:889357641434:android:ab528f1a1e1336432d27e3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "burari-date",
+          "configurations": {
+            "android": "1:889357641434:android:ab528f1a1e1336432d27e3",
+            "ios": "1:889357641434:ios:b58cd38ba9138f612d27e3"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+    }
+  ]
+}
