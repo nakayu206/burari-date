@@ -1,41 +1,47 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
-/** 月次フェアユース上限(Claude API等のコスト対策バックストップ、仕様書10章) */
-export const MONTHLY_LIMIT = 30;
+/** 無料で使える累計回数(コスト対策バックストップ、仕様書10章) */
+export const LIFETIME_FREE_LIMIT = 10;
 
-export function currentMonthKey(date: Date = new Date()): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+function lifetimeUsedOf(data: FirebaseFirestore.DocumentData | undefined): number {
+  return data?.lifetimeFreeUsed ?? 0;
 }
 
 /**
- * 月次フェアユース上限をチェックし、上限内であれば利用回数を1増やす。
- * 上限超過時はHttpsErrorを投げ、呼び出し元(getCandidates)の処理を止める。
+ * 無料利用の累計上限に達していないか確認する(書き込みは行わない)。
+ * 外部API呼び出し前にfail-fastさせ、失敗が確定している呼び出しでの
+ * 無駄な課金を防ぐ。上限超過時はHttpsErrorを投げる。
  */
-export async function checkAndRecordUsage(uid: string): Promise<void> {
+export async function assertUnderFreeLimit(uid: string): Promise<void> {
+  const db = getFirestore();
+  const snap = await db.collection("users").doc(uid).get();
+
+  if (lifetimeUsedOf(snap.data()) >= LIFETIME_FREE_LIMIT) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。",
+    );
+  }
+}
+
+/**
+ * 候補生成に成功した後にのみ呼び出し、累計利用回数を1増やす。
+ * 外部API呼び出しが失敗した試行分は消費しない(候補を返せなかったのに
+ * 枠だけ失う事故を防ぐため、記録は成功時のみ行う)。
+ */
+export async function recordUsage(uid: string): Promise<void> {
   const db = getFirestore();
   const ref = db.collection("users").doc(uid);
-  const month = currentMonthKey();
 
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const data = snap.data();
-    const sameMonth = data?.monthlyResetKey === month;
-    const monthlyCount = sameMonth ? (data?.monthlyGachaCount ?? 0) : 0;
-
-    if (monthlyCount >= MONTHLY_LIMIT) {
-      throw new HttpsError(
-        "resource-exhausted",
-        "今月の利用上限に達しました。来月またご利用ください",
-      );
-    }
+    const used = lifetimeUsedOf(snap.data());
 
     tx.set(
       ref,
       {
-        monthlyGachaCount: monthlyCount + 1,
-        monthlyResetKey: month,
-        lifetimeFreeUsed: (data?.lifetimeFreeUsed ?? 0) + 1,
+        lifetimeFreeUsed: used + 1,
         updatedAt: new Date(),
       },
       { merge: true },

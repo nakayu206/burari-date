@@ -2,7 +2,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
-import { checkAndRecordUsage } from "./fairUse";
+import { assertUnderFreeLimit, recordUsage } from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
 import type { Candidate, CandidateCategory } from "./types";
@@ -39,7 +39,7 @@ export const getCandidates = onCall<GetCandidatesRequest>(
       throw new HttpsError("invalid-argument", "リクエスト内容が不正です");
     }
 
-    await checkAndRecordUsage(request.auth.uid);
+    await assertUnderFreeLimit(request.auth.uid);
 
     const rawPlaces =
       category === "gourmet"
@@ -55,6 +55,8 @@ export const getCandidates = onCall<GetCandidatesRequest>(
           ? estimateWalkMinutes(latitude, longitude, pick.latitude, pick.longitude)
           : 5,
     }));
+
+    await recordUsage(request.auth.uid);
 
     return { candidates };
   },
