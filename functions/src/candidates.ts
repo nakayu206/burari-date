@@ -23,6 +23,9 @@ export const getCandidates = onCall<GetCandidatesRequest>(
   {
     secrets: [hotpepperApiKey, foursquareApiKey, anthropicApiKey],
     region: "us-central1",
+    // 実行中にタイムアウトで強制終了されるとreserveUsageの解放(catch節)が
+    // 走らず無料枠を失ってしまうため、余裕を持たせて発生確率を下げる。
+    timeoutSeconds: 120,
   },
   async (request) => {
     if (!request.auth) {
