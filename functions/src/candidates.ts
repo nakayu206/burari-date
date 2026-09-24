@@ -2,7 +2,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
-import { assertUnderFreeLimit, recordUsage } from "./fairUse";
+import { releaseUsage, reserveUsage } from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
 import type { Candidate, CandidateCategory } from "./types";
@@ -39,25 +39,33 @@ export const getCandidates = onCall<GetCandidatesRequest>(
       throw new HttpsError("invalid-argument", "リクエスト内容が不正です");
     }
 
-    await assertUnderFreeLimit(request.auth.uid);
+    await reserveUsage(request.auth.uid);
 
-    const rawPlaces =
-      category === "gourmet"
-        ? await searchGourmet(latitude, longitude)
-        : await searchSightseeing(latitude, longitude);
+    try {
+      const rawPlaces =
+        category === "gourmet"
+          ? await searchGourmet(latitude, longitude)
+          : await searchSightseeing(latitude, longitude);
 
-    const picks = await generateCandidates(stationName, category, rawPlaces);
+      const picks = await generateCandidates(stationName, category, rawPlaces);
 
-    const candidates: Candidate[] = picks.map((pick) => ({
-      ...pick,
-      walkMinutes:
-        pick.latitude != null && pick.longitude != null
-          ? estimateWalkMinutes(latitude, longitude, pick.latitude, pick.longitude)
-          : 5,
-    }));
+      const candidates: Candidate[] = picks.map((pick) => ({
+        ...pick,
+        walkMinutes:
+          pick.latitude != null && pick.longitude != null
+            ? estimateWalkMinutes(
+                latitude,
+                longitude,
+                pick.latitude,
+                pick.longitude,
+              )
+            : 5,
+      }));
 
-    await recordUsage(request.auth.uid);
-
-    return { candidates };
+      return { candidates };
+    } catch (e) {
+      await releaseUsage(request.auth.uid);
+      throw e;
+    }
   },
 );

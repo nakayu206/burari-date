@@ -9,28 +9,38 @@ function lifetimeUsedOf(data: FirebaseFirestore.DocumentData | undefined): numbe
 }
 
 /**
- * 無料利用の累計上限に達していないか確認する(書き込みは行わない)。
- * 外部API呼び出し前にfail-fastさせ、失敗が確定している呼び出しでの
- * 無駄な課金を防ぐ。上限超過時はHttpsErrorを投げる。
+ * 無料利用の枠を1つ予約する(チェックと加算を1トランザクションで行い、
+ * 同時リクエストによる上限の突破を防ぐ)。外部API呼び出しの前に呼ぶこと。
+ * 上限超過時はHttpsErrorを投げ、加算は行わない。
  */
-export async function assertUnderFreeLimit(uid: string): Promise<void> {
+export async function reserveUsage(uid: string): Promise<void> {
   const db = getFirestore();
-  const snap = await db.collection("users").doc(uid).get();
+  const ref = db.collection("users").doc(uid);
 
-  if (lifetimeUsedOf(snap.data()) >= LIFETIME_FREE_LIMIT) {
-    throw new HttpsError(
-      "resource-exhausted",
-      "無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。",
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const used = lifetimeUsedOf(snap.data());
+
+    if (used >= LIFETIME_FREE_LIMIT) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。",
+      );
+    }
+
+    tx.set(
+      ref,
+      { lifetimeFreeUsed: used + 1, updatedAt: new Date() },
+      { merge: true },
     );
-  }
+  });
 }
 
 /**
- * 候補生成に成功した後にのみ呼び出し、累計利用回数を1増やす。
- * 外部API呼び出しが失敗した試行分は消費しない(候補を返せなかったのに
- * 枠だけ失う事故を防ぐため、記録は成功時のみ行う)。
+ * 外部API呼び出しが失敗した場合に、reserveUsageで確保した枠を1つ戻す。
+ * 失敗した試行分の回数を消費しないようにするため。
  */
-export async function recordUsage(uid: string): Promise<void> {
+export async function releaseUsage(uid: string): Promise<void> {
   const db = getFirestore();
   const ref = db.collection("users").doc(uid);
 
@@ -40,10 +50,7 @@ export async function recordUsage(uid: string): Promise<void> {
 
     tx.set(
       ref,
-      {
-        lifetimeFreeUsed: used + 1,
-        updatedAt: new Date(),
-      },
+      { lifetimeFreeUsed: Math.max(0, used - 1), updatedAt: new Date() },
       { merge: true },
     );
   });
