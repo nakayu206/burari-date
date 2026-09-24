@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:burari_date/data/repositories/candidate_repository_impl.dart';
@@ -85,6 +86,28 @@ void main() {
         throwsException,
       );
       expect(called, isFalse);
+    });
+
+    test('バックエンドが利用上限エラーを返した場合はそのメッセージを伝える', () async {
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          throw FirebaseFunctionsException(
+            message: '今月の利用上限に達しました。来月またご利用ください',
+            code: 'resource-exhausted',
+          );
+        },
+      );
+
+      await expectLater(
+        repository.getCandidates(arrival, CandidateCategory.gourmet),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('今月の利用上限に達しました'),
+          ),
+        ),
+      );
     });
   });
 }
