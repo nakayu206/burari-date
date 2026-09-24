@@ -29,7 +29,7 @@ class Candidate {
   final String? address;
   final String? imageUrl;
 
-  /// 店舗/観光地検索API接続(Issue #3)までは未設定。S-06の地図はnullの間、
+  /// 外部APIが座標を返さない場合はnullになりうる。S-06の地図はnullの間、
   /// 到着駅の座標をフォールバックとして表示する。
   final double? latitude;
   final double? longitude;
