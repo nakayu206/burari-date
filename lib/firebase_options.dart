@@ -56,7 +56,6 @@ class DefaultFirebaseOptions {
     projectId: 'burari-date',
     storageBucket: 'burari-date.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyB3SDzQr5B8rMj7ignafGnr2jNVXLrpVJM',
     appId: '1:889357641434:ios:b58cd38ba9138f612d27e3',

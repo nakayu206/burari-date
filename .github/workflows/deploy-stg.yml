@@ -1,0 +1,55 @@
+name: Deploy STG
+
+# 何をする？
+#   main ブランチに push されたら、stg flavor で Android APK をビルドする。
+#   （実際の配信先：Firebase App Distribution などは後から追記する想定）
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-stg-android:
+    name: Build STG (Android)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # stg flavor でビルド
+      - name: Build APK (stg)
+        run: flutter build apk --flavor stg -t lib/main_stg.dart --release
+
+      # 成果物を GitHub Actions のアーティファクトとして保存
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-stg-release
+          path: build/app/outputs/flutter-apk/app-stg-release.apk
+          retention-days: 14
+
+      # ▼ 配信したいときはここを有効化（要：Firebase などの secrets 設定）
+      #
+      # - name: Upload to Firebase App Distribution
+      #   uses: wzieba/Firebase-Distribution-Github-Action@v1
+      #   with:
+      #     appId: ${{ secrets.FIREBASE_APP_ID_STG }}
+      #     serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIALS }}
+      #     groups: testers
+      #     file: build/app/outputs/flutter-apk/app-stg-release.apk
