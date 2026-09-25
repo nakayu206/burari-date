@@ -1,8 +1,9 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:burari_date/data/datasources/cloud/favorite_firestore_data_source.dart';
 import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/favorite.dart';
@@ -33,10 +34,6 @@ class _FailingFavoriteRepository implements FavoriteRepository {
 }
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   group('FavoriteListPage', () {
     testWidgets('お気に入りが0件の場合は空状態を表示する', (tester) async {
       await tester.pumpWidget(
@@ -90,7 +87,12 @@ void main() {
       // favoritesProviderをoverrideすると、削除後のinvalidateで同じ固定値が
       // 再取得されてしまい削除が反映されないため、ここではモック化した
       // SharedPreferences上の実データを使う(overrideしない)。
-      final favoriteRepository = FavoriteRepositoryImpl();
+      final favoriteRepository = FavoriteRepositoryImpl(
+        dataSource: FavoriteFirestoreDataSource(
+          firestore: FakeFirebaseFirestore(),
+          uid: 'test-uid',
+        ),
+      );
       await favoriteRepository.addFavorite(
         Favorite(
           candidateId: 'c1',

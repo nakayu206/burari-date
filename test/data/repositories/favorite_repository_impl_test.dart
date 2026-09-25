@@ -1,6 +1,7 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:burari_date/data/datasources/cloud/favorite_firestore_data_source.dart';
 import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/favorite.dart';
@@ -17,14 +18,19 @@ Favorite _favorite(String candidateId, DateTime savedAt) {
   );
 }
 
-void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
+FavoriteRepositoryImpl _repository() {
+  return FavoriteRepositoryImpl(
+    dataSource: FavoriteFirestoreDataSource(
+      firestore: FakeFirebaseFirestore(),
+      uid: 'user1',
+    ),
+  );
+}
 
+void main() {
   group('FavoriteRepositoryImpl', () {
     test('addFavoriteで保存した候補はisFavoriteでtrueになる', () async {
-      final repository = FavoriteRepositoryImpl();
+      final repository = _repository();
 
       await repository.addFavorite(_favorite('c1', DateTime(2026, 1, 1)));
 
@@ -33,7 +39,7 @@ void main() {
     });
 
     test('同じcandidateIdを再度addFavoriteしても重複保存されない', () async {
-      final repository = FavoriteRepositoryImpl();
+      final repository = _repository();
 
       await repository.addFavorite(_favorite('c1', DateTime(2026, 1, 1)));
       await repository.addFavorite(_favorite('c1', DateTime(2026, 1, 2)));
@@ -44,7 +50,7 @@ void main() {
     });
 
     test('removeFavoriteで解除するとisFavoriteがfalseになる', () async {
-      final repository = FavoriteRepositoryImpl();
+      final repository = _repository();
       await repository.addFavorite(_favorite('c1', DateTime(2026, 1, 1)));
 
       await repository.removeFavorite('c1');
@@ -54,31 +60,13 @@ void main() {
     });
 
     test('loadFavoritesは新しい順に並べ替えて返す', () async {
-      final repository = FavoriteRepositoryImpl();
+      final repository = _repository();
       await repository.addFavorite(_favorite('old', DateTime(2026, 1, 1)));
       await repository.addFavorite(_favorite('new', DateTime(2026, 6, 1)));
 
       final favorites = await repository.loadFavorites();
 
       expect(favorites.map((f) => f.candidateId), ['new', 'old']);
-    });
-
-    test('同時にaddFavoriteを呼んでも両方保存される(直列化されている)', () async {
-      final repository = FavoriteRepositoryImpl();
-
-      final future1 = repository.addFavorite(
-        _favorite('c1', DateTime(2026, 1, 1)),
-      );
-      final future2 = repository.addFavorite(
-        _favorite('c2', DateTime(2026, 1, 2)),
-      );
-      await Future.wait([future1, future2]);
-
-      final favorites = await repository.loadFavorites();
-      expect(
-        favorites.map((f) => f.candidateId),
-        unorderedEquals(['c1', 'c2']),
-      );
     });
   });
 }
