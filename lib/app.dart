@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'core/config/flavor.dart';
 import 'core/constants/app_colors.dart';
 import 'presentation/pages/home/home_page.dart';
 
@@ -12,7 +13,7 @@ class BurariDateApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'ぶらりデートガチャ',
+      title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       home: const HomePage(),

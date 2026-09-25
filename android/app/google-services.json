@@ -23,6 +23,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889357641434:android:3033ea11f5b660722d27e3",
+        "android_client_info": {
+          "package_name": "com.buraridate.burari_date.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889357641434:android:3c3373dcf50ba3fc2d27e3",
+        "android_client_info": {
+          "package_name": "com.buraridate.burari_date.stg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

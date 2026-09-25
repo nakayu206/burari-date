@@ -1,0 +1,64 @@
+name: Deploy PROD
+
+# 何をする？
+#   v1.0.0 のような「v始まりのタグ」が push されたら、
+#   prod flavor で Android App Bundle (.aab) をビルドする。
+#   （実際の Google Play への配信は後から追記する想定）
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-prod-android:
+    name: Build PROD (Android)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # prod flavor でビルド（Play ストア用は aab）
+      - name: Build App Bundle (prod)
+        run: flutter build appbundle --flavor prod -t lib/main_prod.dart --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-prod-release
+          path: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          retention-days: 30
+
+      # ▼ Google Play へ自動配信したいときはここを有効化
+      #   （要：GOOGLE_PLAY_SERVICE_ACCOUNT_JSON などの secrets 設定）
+      #
+      # - name: Upload to Google Play (Internal track)
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+      #     packageName: com.buraridate.burari_date
+      #     releaseFiles: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+      #     track: internal
+
+      # GitHub Releases も自動作成（タグから）
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: build/app/outputs/bundle/prodRelease/app-prod-release.aab
