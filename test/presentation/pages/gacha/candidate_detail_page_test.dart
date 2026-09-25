@@ -1,19 +1,32 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:burari_date/data/datasources/cloud/favorite_firestore_data_source.dart';
+import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_detail_page.dart';
+import 'package:burari_date/presentation/providers/favorite_providers.dart';
+
+/// テストごとに独立したFakeFirebaseFirestoreを使い、状態が漏れないようにする。
+List<Override> _favoriteOverrides() {
+  return [
+    favoriteRepositoryProvider.overrideWithValue(
+      FavoriteRepositoryImpl(
+        dataSource: FavoriteFirestoreDataSource(
+          firestore: FakeFirebaseFirestore(),
+          uid: 'test-uid',
+        ),
+      ),
+    ),
+  ];
+}
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   group('CandidateDetailPage', () {
     const candidateWithoutLocation = Candidate(
       id: 'c1',
@@ -26,8 +39,9 @@ void main() {
 
     testWidgets('候補にも到着駅にも座標が無い場合は地図の代わりにプレースホルダーを表示する', (tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
             home: CandidateDetailPage(candidate: candidateWithoutLocation),
           ),
         ),
@@ -50,7 +64,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithoutLocation,
@@ -87,7 +102,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithLocation,
@@ -114,7 +130,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithoutLocation,
@@ -140,6 +157,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithoutLocation,
@@ -175,6 +193,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithoutLocation,
@@ -206,6 +225,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidateWithoutLocation,
@@ -250,7 +270,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
           child: MaterialApp(
             home: CandidateDetailPage(
               candidate: candidatePartialLocation,
@@ -270,8 +291,9 @@ void main() {
 
     testWidgets('保存する→保存済みに切り替わり、再度タップすると解除できる', (tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
             home: CandidateDetailPage(candidate: candidateWithoutLocation),
           ),
         ),
@@ -295,8 +317,9 @@ void main() {
 
     testWidgets('グルメ候補はホットペッパーのクレジットを表示する', (tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
             home: CandidateDetailPage(candidate: candidateWithoutLocation),
           ),
         ),
@@ -317,8 +340,9 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
             home: CandidateDetailPage(candidate: sightseeingCandidate),
           ),
         ),

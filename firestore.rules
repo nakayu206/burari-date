@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      // usersドキュメント自体(フェアユース上限のカウンタ、Issue #10)は
+      // クライアントから直接読み書きさせない。Cloud Functions(Admin SDK、
+      // ルールを経由しない)からのみ更新する。
+      allow read, write: if false;
+
+      match /favorites/{favoriteId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /history/{entryId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}

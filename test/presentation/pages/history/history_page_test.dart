@@ -1,21 +1,20 @@
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:burari_date/data/datasources/cloud/favorite_firestore_data_source.dart';
+import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/gacha_history_entry.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/presentation/pages/favorite/favorite_list_page.dart';
 import 'package:burari_date/presentation/pages/history/history_page.dart';
+import 'package:burari_date/presentation/providers/favorite_providers.dart';
 import 'package:burari_date/presentation/providers/gacha_history_providers.dart';
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   group('HistoryPage', () {
     testWidgets('履歴が0件の場合は空状態を表示する', (tester) async {
       await tester.pumpWidget(
@@ -134,6 +133,14 @@ void main() {
         ProviderScope(
           overrides: [
             gachaHistoryProvider.overrideWith((ref) async => const []),
+            favoriteRepositoryProvider.overrideWithValue(
+              FavoriteRepositoryImpl(
+                dataSource: FavoriteFirestoreDataSource(
+                  firestore: FakeFirebaseFirestore(),
+                  uid: 'test-uid',
+                ),
+              ),
+            ),
           ],
           child: const MaterialApp(home: HistoryPage()),
         ),
