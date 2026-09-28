@@ -68,6 +68,38 @@ void main() {
 
       expect(result.direction, isNot(GachaDirection.random));
     });
+
+    test('終点駅から出発してrandom方向を選んでも、進める方向(down)が選ばれ出発駅のままにならない', () {
+      for (var i = 0; i < 20; i++) {
+        final result = RunGacha()(
+          departure: line.stations[4],
+          line: line,
+          minStops: 1,
+          maxStops: 3,
+          direction: GachaDirection.random,
+        );
+
+        expect(result.direction, GachaDirection.down);
+        expect(result.stopsCount, greaterThan(0));
+        expect(result.arrivalStation, isNot(line.stations[4]));
+      }
+    });
+
+    test('起点駅から出発してrandom方向を選んでも、進める方向(up)が選ばれ出発駅のままにならない', () {
+      for (var i = 0; i < 20; i++) {
+        final result = RunGacha()(
+          departure: line.stations[0],
+          line: line,
+          minStops: 1,
+          maxStops: 3,
+          direction: GachaDirection.random,
+        );
+
+        expect(result.direction, GachaDirection.up);
+        expect(result.stopsCount, greaterThan(0));
+        expect(result.arrivalStation, isNot(line.stations[0]));
+      }
+    });
   });
 
   group('RunGacha 環状路線(isCircular)', () {

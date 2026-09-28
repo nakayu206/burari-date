@@ -111,14 +111,26 @@ ${JSON.stringify(data)}
 [{"index": 0, "catchCopy": "...", "reason": "..."}]`;
 }
 
+/**
+ * Claudeの応答を解析する。解析に失敗した場合は空配列を返さず例外を投げる
+ * (呼び出し元のgetCandidatesがcatchしてreserveUsageで確保した無料枠を
+ * 解放できるようにするため。空配列のまま成功扱いにすると、候補が1件も
+ * 表示されないのに無料枠だけ消費してしまう)。
+ */
 export function parsePicks(text: string): Pick[] {
+  const jsonText = extractJsonArray(text);
+  if (jsonText === null) {
+    throw new Error("Claude APIの応答からJSON配列を検出できませんでした");
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(extractJsonArray(text));
+    parsed = JSON.parse(jsonText);
   } catch {
-    return [];
+    throw new Error("Claude APIの応答をJSONとして解析できませんでした");
   }
-  if (!Array.isArray(parsed)) return [];
+  if (!Array.isArray(parsed)) {
+    throw new Error("Claude APIの応答が配列形式ではありません");
+  }
   return parsed.filter((item): item is Pick => {
     const p = item as Partial<Pick>;
     return (
@@ -130,9 +142,9 @@ export function parsePicks(text: string): Pick[] {
 }
 
 /** モデルが前後に説明文を付けた場合に備え、最初の配列部分だけを取り出す */
-function extractJsonArray(text: string): string {
+function extractJsonArray(text: string): string | null {
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start === -1 || end === -1 || end < start) return "[]";
+  if (start === -1 || end === -1 || end < start) return null;
   return text.slice(start, end + 1);
 }

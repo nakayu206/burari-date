@@ -7,6 +7,18 @@ export const foursquareApiKey = defineSecret("FOURSQUARE_API_KEY");
 
 const API_VERSION = "2025-06-17";
 
+/**
+ * 観光・レジャー施設として検索したいFoursquareの大分類カテゴリID。
+ * https://docs.foursquare.com/data-products/docs/categories
+ * 絞り込まずに距離順で取得すると、駅前の近い20件が飲食店で埋まり、
+ * 少し離れた公園・観光施設が候補にすら上がらないことがあるため、
+ * 検索段階でカテゴリを絞る(AIに事後で除外させるだけでは不十分)。
+ */
+const SIGHTSEEING_CATEGORY_IDS = [
+  "4d4b7105d754a06377d81259", // Outdoors & Recreation
+  "4d4b7104d754a06370d81259", // Arts & Entertainment
+];
+
 interface RawFoursquarePlace {
   fsq_place_id: string;
   name: string;
@@ -26,6 +38,7 @@ export async function searchSightseeing(
   url.searchParams.set("radius", "1000");
   url.searchParams.set("limit", "20");
   url.searchParams.set("sort", "DISTANCE");
+  url.searchParams.set("fsq_category_ids", SIGHTSEEING_CATEGORY_IDS.join(","));
 
   const res = await fetch(url, {
     headers: {
