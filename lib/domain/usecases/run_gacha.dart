@@ -26,18 +26,24 @@ class RunGacha {
     );
     assert(departureIndex != -1, 'departure station must belong to line');
 
+    final stationCount = line.stations.length;
+    final upReachable = stationCount - 1 - departureIndex;
+    final downReachable = departureIndex;
+
+    // ランダム方向は、移動できない方向(終端駅でその先が無い方向)を除外して
+    // 選ぶ。除外しないと、非環状路線の終端で外向きが選ばれた場合にstopsCount
+    // が強制的に0になり、駅数指定を無視して出発駅がそのまま当選してしまう。
     final resolvedDirection = direction == GachaDirection.random
-        ? (_random.nextBool() ? GachaDirection.up : GachaDirection.down)
+        ? _resolveRandomDirection(line.isCircular, upReachable, downReachable)
         : direction;
 
-    final stationCount = line.stations.length;
     // 環状路線(山手線・大阪環状線等)は始発・終着が実際には隣接しているため、
     // 配列の端で打ち切らず一周分(stationCount-1駅)まで狙えるようにする。
     final maxReachable = line.isCircular
         ? stationCount - 1
         : resolvedDirection == GachaDirection.up
-        ? stationCount - 1 - departureIndex
-        : departureIndex;
+        ? upReachable
+        : downReachable;
 
     final clampedMax = min(maxStops, maxReachable);
     final clampedMin = min(minStops, clampedMax).clamp(0, clampedMax);
@@ -65,5 +71,19 @@ class RunGacha {
       stopsCount: stopsCount,
       executedAt: DateTime.now(),
     );
+  }
+
+  /// 環状路線ならどちらの方向にも進めるのでランダムでよいが、非環状路線では
+  /// 進めない方向(到達可能駅数0)を除外してから選ぶ。
+  GachaDirection _resolveRandomDirection(
+    bool isCircular,
+    int upReachable,
+    int downReachable,
+  ) {
+    if (!isCircular) {
+      if (upReachable == 0 && downReachable > 0) return GachaDirection.down;
+      if (downReachable == 0 && upReachable > 0) return GachaDirection.up;
+    }
+    return _random.nextBool() ? GachaDirection.up : GachaDirection.down;
   }
 }

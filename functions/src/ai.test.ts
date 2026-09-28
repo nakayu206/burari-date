@@ -20,8 +20,12 @@ test("説明文が前後に付いていても配列部分だけ取り出せる",
   assert.deepEqual(picks, [{ index: 1, catchCopy: "a", reason: "b" }]);
 });
 
-test("不正な形式は空配列を返す", () => {
-  assert.deepEqual(parsePicks("こわれています"), []);
+test("配列が見つからない場合は例外を投げる(無料枠を消費しないため)", () => {
+  assert.throws(() => parsePicks("こわれています"));
+});
+
+test("配列に見えても不正なJSONの場合は例外を投げる", () => {
+  assert.throws(() => parsePicks("[{index: 0"));
 });
 
 test("必須フィールドが欠けた要素は除外する", () => {
