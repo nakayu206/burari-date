@@ -9,6 +9,7 @@ import '../../../domain/entities/gacha_result.dart';
 import '../../../domain/entities/station.dart';
 import '../../../domain/repositories/candidate_repository.dart';
 import '../../providers/candidate_providers.dart';
+import '../../widgets/pixel_icon.dart';
 import 'candidate_detail_page.dart';
 
 /// S-05 候補一覧画面(グルメ/観光タブ)
@@ -214,11 +215,12 @@ class _CandidateListView extends StatelessWidget {
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Icon(
-                    candidate.category == CandidateCategory.gourmet
-                        ? Icons.ramen_dining_rounded
-                        : Icons.park_rounded,
-                    color: AppColors.textSecondary,
+                  child: Center(
+                    child: GenreIcon(
+                      category: candidate.category,
+                      categoryName: candidate.categoryName,
+                      size: 36,
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -251,6 +253,16 @@ class _CandidateListView extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (candidate.budget != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          '予算の目安 ${candidate.budget}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: AppFontSizes.caption,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

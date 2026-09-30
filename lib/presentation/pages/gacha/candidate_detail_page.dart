@@ -12,6 +12,7 @@ import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/favorite.dart';
 import '../../../domain/entities/station.dart';
 import '../../providers/favorite_providers.dart';
+import '../../widgets/pixel_icon.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
 /// テストでは実プラットフォーム呼び出し(ブラウザ起動等)を避けるため差し替える。
@@ -83,7 +84,10 @@ class CandidateDetailPage extends ConsumerWidget {
             // 名前は、ほかのアプリで検索するために、すぐコピーできるようにする。
             Row(
               children: [
-                _CategoryBadge(category: candidate.category),
+                _CategoryBadge(
+                  category: candidate.category,
+                  categoryName: candidate.categoryName,
+                ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
@@ -125,6 +129,14 @@ class CandidateDetailPage extends ConsumerWidget {
               // 直線距離からの概算(バックエンドで徒歩80m/分として計算)。
               text: '駅から徒歩約${candidate.walkMinutes}分',
             ),
+            // 予算の目安は、ホットペッパーの平均ディナー予算(飲食店のみ)。
+            if (candidate.budget != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _InfoRow(
+                icon: Icons.payments_outlined,
+                text: '予算の目安(ディナー): ${candidate.budget}',
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             if (_stationPoint != null || _placePoint != null)
               _CandidateMap(
@@ -350,9 +362,10 @@ class _CandidateImageState extends State<_CandidateImage> {
 
 /// カテゴリ(グルメ/観光)を示す、名前の横のアイコン。
 class _CategoryBadge extends StatelessWidget {
-  const _CategoryBadge({required this.category});
+  const _CategoryBadge({required this.category, this.categoryName});
 
   final CandidateCategory category;
+  final String? categoryName;
 
   @override
   Widget build(BuildContext context) {
@@ -364,12 +377,12 @@ class _CategoryBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.secondary, width: 1.5),
       ),
-      child: Icon(
-        category == CandidateCategory.gourmet
-            ? Icons.ramen_dining_rounded
-            : Icons.park_rounded,
-        size: 24,
-        color: AppColors.textSecondary,
+      child: Center(
+        child: GenreIcon(
+          category: category,
+          categoryName: categoryName,
+          size: 24,
+        ),
       ),
     );
   }
