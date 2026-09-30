@@ -35,7 +35,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
     final latitude = arrival.latitude;
     final longitude = arrival.longitude;
     if (latitude == null || longitude == null) {
-      throw Exception('到着駅の位置情報が取得できませんでした');
+      throw const CandidateFetchException('到着駅の位置情報が取得できませんでした');
     }
 
     Map<String, dynamic> data;
@@ -57,7 +57,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
       });
     } on FirebaseFunctionsException catch (e) {
       // バックエンドのエラーメッセージ(利用上限案内など)をそのまま表示する。
-      throw Exception(e.message ?? '候補の取得に失敗しました');
+      throw CandidateFetchException(e.message ?? '候補の取得に失敗しました');
     }
 
     final rawCandidates = data['candidates'] as List<dynamic>? ?? [];

@@ -6,6 +6,7 @@ import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/gacha_result.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/domain/entities/station.dart';
+import 'package:burari_date/domain/repositories/candidate_repository.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_list_page.dart';
 import 'package:burari_date/presentation/providers/candidate_providers.dart';
 
@@ -137,6 +138,46 @@ void main() {
 
       expect(find.text('キャッチコピー'), findsOneWidget);
       expect(find.textContaining('AI:'), findsNothing);
+    });
+
+    testWidgets('無料枠の上限などの案内は、内部の表記を付けずにそのまま表示する', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => throw const CandidateFetchException(
+                '無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。',
+              ),
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Exception'), findsNothing);
+      expect(find.textContaining('候補の取得に失敗しました'), findsNothing);
+    });
+
+    testWidgets('想定外のエラーは、内部の表記を出さずに汎用の文言を表示する', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => throw StateError('internal detail'),
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('候補の取得に失敗しました'), findsOneWidget);
+      expect(find.textContaining('internal detail'), findsNothing);
     });
 
     testWidgets('取得に失敗したら「再読み込み」で取り直せる', (tester) async {

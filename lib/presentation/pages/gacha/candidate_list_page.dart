@@ -7,6 +7,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/gacha_result.dart';
 import '../../../domain/entities/station.dart';
+import '../../../domain/repositories/candidate_repository.dart';
 import '../../providers/candidate_providers.dart';
 import 'candidate_detail_page.dart';
 
@@ -87,6 +88,12 @@ class _CandidateListTab extends ConsumerStatefulWidget {
   ConsumerState<_CandidateListTab> createState() => _CandidateListTabState();
 }
 
+/// 取得に失敗した理由を画面に出す文言にする。利用者向けの理由(無料枠の上限の
+/// 案内など)はそのまま出し、想定外のエラーは内部の表記を出さない。
+String _errorMessage(Object error) {
+  return error is CandidateFetchException ? error.message : '候補の取得に失敗しました';
+}
+
 /// TabBarViewは表示していないタブのWidgetを破棄するため、そのままだとタブを
 /// 切り替えるたびに候補を取り直す(AIの呼び出しと無料枠の消費が毎回発生する)。
 /// 一度取得した候補は同じガチャ結果の間は変わらないので、タブを保持する。
@@ -113,7 +120,7 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '候補の取得に失敗しました: $error',
+                _errorMessage(error),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppColors.textSecondary,

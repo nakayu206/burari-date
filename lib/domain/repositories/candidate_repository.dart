@@ -2,6 +2,20 @@ import '../entities/ai_preference.dart';
 import '../entities/candidate.dart';
 import '../entities/station.dart';
 
+/// 候補を取得できなかった理由を、利用者向けの文言で持つ例外。
+///
+/// バックエンドが返した案内(無料枠の上限など)や、到着駅の位置情報がない
+/// といった理由を、そのまま画面に出せるようにする。[toString]も文言だけを
+/// 返し、「Exception:」などの内部用の表記が画面に出ないようにしている。
+class CandidateFetchException implements Exception {
+  const CandidateFetchException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// 到着駅周辺のグルメ/観光候補を取得する(仕様書 5章 AI連携仕様)。
 ///
 /// バックエンド(Firebase Functions)経由で店舗/観光地API(ホットペッパー
