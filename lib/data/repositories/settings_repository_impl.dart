@@ -54,6 +54,14 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
+  Future<AiPreference?> loadSavedAiPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    // 保存時は3つのキーを必ずまとめて書くため、ジャンルのキーの有無で判定する。
+    if (!prefs.containsKey(_kAiGenres)) return null;
+    return loadAiPreference();
+  }
+
+  @override
   Future<void> saveAiPreference(AiPreference preference) async {
     final prefs = await SharedPreferences.getInstance();
     // 並びを固定して、同じ内容なら同じ値が保存されるようにする。

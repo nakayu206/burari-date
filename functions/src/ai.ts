@@ -1,5 +1,6 @@
 import { defineSecret } from "firebase-functions/params";
 
+import type { Preference } from "./preference";
 import type { Candidate, CandidateCategory, RawPlace } from "./types";
 
 /** Claude API(候補の要約・キャッチコピー生成、Issue #4・#28) */
@@ -18,11 +19,12 @@ export async function generateCandidates(
   stationName: string,
   category: CandidateCategory,
   rawPlaces: RawPlace[],
+  preference?: Preference,
 ): Promise<Omit<Candidate, "walkMinutes">[]> {
   if (rawPlaces.length === 0) return [];
 
   const targets = rawPlaces.slice(0, 20);
-  const prompt = buildPrompt(stationName, category, targets);
+  const prompt = buildPrompt(stationName, category, targets, preference);
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -80,10 +82,37 @@ export function toCandidates(
     .slice(0, MAX_RESULTS);
 }
 
-function buildPrompt(
+/**
+ * ユーザーの好みをプロンプトに添える文を作る。好みは絞り込みではなく
+ * 「優先して選ぶ」ヒントとして扱い、該当が少なくても件数を減らさない。
+ * 観光では飲食ジャンルは無関係なので、雰囲気と予算感だけを使う。
+ */
+export function buildPreferenceNote(
+  category: CandidateCategory,
+  preference?: Preference,
+): string {
+  if (!preference) return "";
+  const items: string[] = [];
+  if (category === "gourmet" && preference.genres.length > 0) {
+    items.push(`好きなジャンル: ${preference.genres.join("、")}`);
+  }
+  if (preference.budget) items.push(`予算感: ${preference.budget}`);
+  if (preference.mood) items.push(`好みの雰囲気: ${preference.mood}`);
+  if (items.length === 0) return "";
+
+  return `
+ユーザーの好み(${items.join(" / ")})に合いそうな場所を優先して選んでください。
+ただし好みに合う場所が少ない場合は、他の場所も選んで構いません。
+好みに合うかどうかは、与えられたデータ(店名・カテゴリなど)から推測できる範囲で判断し、
+価格や雰囲気など、データにない事実は断定して書かないでください。
+`;
+}
+
+export function buildPrompt(
   stationName: string,
   category: CandidateCategory,
   targets: RawPlace[],
+  preference?: Preference,
 ): string {
   const categoryLabel = category === "gourmet" ? "飲食店" : "観光・レジャー施設";
   const sightseeingNote =
@@ -101,7 +130,7 @@ function buildPrompt(
 ${stationName}周辺の${categoryLabel}の実データが以下のJSONで与えられます。
 この中から、デートに向いていそうな場所を最大${MAX_RESULTS}件選び、
 それぞれに短いキャッチコピー(15文字程度)とおすすめ理由(40文字程度)を日本語で書いてください。
-${sightseeingNote}
+${sightseeingNote}${buildPreferenceNote(category, preference)}
 店名・住所などの事実情報は絶対に創作せず、与えられたデータのみを使ってください。
 
 データ:

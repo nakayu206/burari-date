@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:burari_date/data/repositories/candidate_repository_impl.dart';
+import 'package:burari_date/domain/entities/ai_preference.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/station.dart';
 
@@ -64,6 +65,46 @@ void main() {
       expect(capturedData?['longitude'], 139.70);
       expect(capturedData?['stationName'], '新宿駅');
       expect(capturedData?['category'], 'sightseeing');
+    });
+
+    test('好み設定を渡すと、ジャンル・予算・雰囲気をリクエストに含める', () async {
+      Map<String, dynamic>? capturedData;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          capturedData = data;
+          return {'candidates': <dynamic>[]};
+        },
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        preference: const AiPreference(
+          genres: {'和食', 'カフェ'},
+          budget: '高め',
+          mood: 'レトロ',
+        ),
+      );
+
+      final preference = capturedData?['preference'] as Map<String, dynamic>;
+      expect(preference['genres'], unorderedEquals(['和食', 'カフェ']));
+      expect(preference['budget'], '高め');
+      expect(preference['mood'], 'レトロ');
+    });
+
+    test('好み設定がない場合はpreferenceのキー自体を送らない(従来どおりの提案)', () async {
+      Map<String, dynamic>? capturedData;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          capturedData = data;
+          return {'candidates': <dynamic>[]};
+        },
+      );
+
+      await repository.getCandidates(arrival, CandidateCategory.gourmet);
+
+      expect(capturedData, isNotNull);
+      expect(capturedData!.containsKey('preference'), isFalse);
     });
 
     test('到着駅に座標が無い場合はバックエンドを呼ばず例外を投げる', () async {

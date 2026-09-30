@@ -11,5 +11,11 @@ abstract interface class SettingsRepository {
 
   Future<AiPreference> loadAiPreference();
 
+  /// ユーザーが一度でも保存した好み設定を返す。未保存ならnull。
+  ///
+  /// [loadAiPreference]は未保存でも初期値を返し画面表示に使うが、AI提案への
+  /// 反映には「ユーザーが選んだ値」だけを使うため、未保存かどうかを区別する。
+  Future<AiPreference?> loadSavedAiPreference();
+
   Future<void> saveAiPreference(AiPreference preference);
 }

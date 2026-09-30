@@ -4,6 +4,7 @@ import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
 import { releaseUsage, reserveUsage } from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
+import { parsePreference } from "./preference";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
 import type { Candidate, CandidateCategory } from "./types";
 
@@ -12,6 +13,8 @@ interface GetCandidatesRequest {
   longitude: number;
   stationName: string;
   category: CandidateCategory;
+  /** AI提案の好み設定(任意)。未設定なら従来どおりの提案にする。 */
+  preference?: unknown;
 }
 
 /**
@@ -50,7 +53,12 @@ export const getCandidates = onCall<GetCandidatesRequest>(
           ? await searchGourmet(latitude, longitude)
           : await searchSightseeing(latitude, longitude);
 
-      const picks = await generateCandidates(stationName, category, rawPlaces);
+      const picks = await generateCandidates(
+        stationName,
+        category,
+        rawPlaces,
+        parsePreference(request.data.preference),
+      );
 
       const candidates: Candidate[] = picks.map((pick) => ({
         ...pick,
