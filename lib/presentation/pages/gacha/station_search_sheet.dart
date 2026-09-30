@@ -134,14 +134,24 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                   child: TextField(
                     controller: _controller,
                     autofocus: true,
+                    // 入力欄の高さいっぱいに広げて縦中央に置く。既定のままだと
+                    // 文字がアイコンより少し上に寄る。
+                    expands: true,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.center,
                     onChanged: _onChanged,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: AppFontSizes.bodyLarge,
                     ),
+                    // 枠と塗りは外側のContainerが担う。テーマのenabled/focusedBorder・
+                    // filledが優先されて二重に見えるため、ここでは全て無効にする。
                     decoration: const InputDecoration(
                       isCollapsed: true,
+                      filled: false,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       hintText: '駅名・路線名を入力',
                     ),
                   ),
