@@ -14,6 +14,25 @@ const ALLOWED_BUDGETS = ["安め", "普通", "高め"];
 const ALLOWED_MOODS = ["静か", "賑やか", "おしゃれ", "レトロ"];
 
 /**
+ * 好みのジャンルに合う飲食店を先頭に並べ替える(元の順序は保つ)。
+ *
+ * 好みは絞り込みではなく優先なので、合わない店も後ろに残す。ジャンルの
+ * 判定は、店のジャンル名に好みの語が含まれるかどうかで行う(例: 好み
+ * 「カフェ」「スイーツ」は、どちらもジャンル名「カフェ・スイーツ」に一致する)。
+ * ジャンル名が取れない店、好みのジャンルがない場合は、順序を変えない。
+ */
+export function prioritizeByGenres<T extends { categoryName?: string }>(
+  places: T[],
+  genres: string[],
+): T[] {
+  if (genres.length === 0) return places;
+  const matches = (place: T) =>
+    place.categoryName !== undefined &&
+    genres.some((genre) => place.categoryName!.includes(genre));
+  return [...places.filter(matches), ...places.filter((p) => !matches(p))];
+}
+
+/**
  * リクエストのpreferenceを検証して取り出す。未指定・形式不正・有効な値が
  * 1つもない場合はundefinedを返し、従来どおりの(好みを使わない)提案にする。
  */

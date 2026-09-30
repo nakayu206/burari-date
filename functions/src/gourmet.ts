@@ -5,6 +5,9 @@ import type { RawPlace } from "./types";
 /** ホットペッパーグルメAPI(飲食店検索、Issue #3・#28) */
 export const hotpepperApiKey = defineSecret("HOTPEPPER_API_KEY");
 
+/** 1回の検索で取得する飲食店の件数(ホットペッパーグルメAPIの上限) */
+const GOURMET_FETCH_COUNT = 100;
+
 interface RawHotPepperShop {
   id: string;
   name: string;
@@ -24,7 +27,9 @@ export async function searchGourmet(
   url.searchParams.set("lat", String(lat));
   url.searchParams.set("lng", String(lng));
   url.searchParams.set("range", "3");
-  url.searchParams.set("count", "20");
+  // 位置検索では距離順に固定される。好みのジャンルを優先できるよう、AIに渡す
+  // 件数(ai.tsで絞る)より多めに取得する(APIの上限は100件)。
+  url.searchParams.set("count", String(GOURMET_FETCH_COUNT));
   url.searchParams.set("format", "json");
 
   const res = await fetch(url);
