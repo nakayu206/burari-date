@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../domain/entities/ai_preference.dart';
 import '../../domain/entities/candidate.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/repositories/candidate_repository.dart';
@@ -28,8 +29,9 @@ class CandidateRepositoryImpl implements CandidateRepository {
   @override
   Future<List<Candidate>> getCandidates(
     Station arrival,
-    CandidateCategory category,
-  ) async {
+    CandidateCategory category, {
+    AiPreference? preference,
+  }) async {
     final latitude = arrival.latitude;
     final longitude = arrival.longitude;
     if (latitude == null || longitude == null) {
@@ -45,6 +47,13 @@ class CandidateRepositoryImpl implements CandidateRepository {
         'category': category == CandidateCategory.gourmet
             ? 'gourmet'
             : 'sightseeing',
+        // 未設定のときはキー自体を送らず、バックエンドは従来どおりの提案にする。
+        if (preference != null)
+          'preference': {
+            'genres': preference.genres.toList(),
+            'budget': preference.budget,
+            'mood': preference.mood,
+          },
       });
     } on FirebaseFunctionsException catch (e) {
       // バックエンドのエラーメッセージ(利用上限案内など)をそのまま表示する。

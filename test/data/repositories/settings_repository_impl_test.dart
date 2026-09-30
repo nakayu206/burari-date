@@ -61,6 +61,23 @@ void main() {
       expect(await repository.loadAiPreference(), preference);
     });
 
+    test('未保存のときloadSavedAiPreferenceはnullを返す(初期値と区別する)', () async {
+      expect(await repository.loadSavedAiPreference(), isNull);
+    });
+
+    test('保存後はloadSavedAiPreferenceが保存した値を返す', () async {
+      const preference = AiPreference(genres: {'中華'}, budget: '高め');
+      await repository.saveAiPreference(preference);
+
+      expect(await repository.loadSavedAiPreference(), preference);
+    });
+
+    test('ユーザーが初期値と同じ内容を保存した場合も「保存済み」として扱う', () async {
+      await repository.saveAiPreference(const AiPreference());
+
+      expect(await repository.loadSavedAiPreference(), const AiPreference());
+    });
+
     test('ジャンルを全て解除した状態も保存でき、初期値に戻らない', () async {
       await repository.saveAiPreference(const AiPreference(genres: {}));
 

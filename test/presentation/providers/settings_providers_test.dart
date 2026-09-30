@@ -21,6 +21,9 @@ class _FailingSaveRepository implements SettingsRepository {
   Future<AiPreference> loadAiPreference() async => const AiPreference();
 
   @override
+  Future<AiPreference?> loadSavedAiPreference() async => null;
+
+  @override
   Future<void> saveAiPreference(AiPreference preference) =>
       Future.error(Exception('save failed'));
 }
