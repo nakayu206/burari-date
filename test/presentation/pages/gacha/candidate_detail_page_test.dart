@@ -11,6 +11,8 @@ import 'package:burari_date/data/repositories/favorite_repository_impl.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_detail_page.dart';
+import 'package:burari_date/presentation/widgets/pixel_icon.dart';
+import 'package:burari_date/presentation/widgets/pixel_icon_data.dart';
 import 'package:burari_date/presentation/providers/favorite_providers.dart';
 
 /// テストごとに独立したFakeFirebaseFirestoreを使い、状態が漏れないようにする。
@@ -60,6 +62,59 @@ void main() {
       expect(find.byType(FlutterMap), findsNothing);
       expect(find.byIcon(Icons.map_rounded), findsOneWidget);
       expect(find.text('経路案内を開く'), findsNothing);
+    });
+
+    testWidgets('予算の目安があれば表示し、なければ行を出さない', (tester) async {
+      Future<void> pump(Candidate candidate) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: _favoriteOverrides(),
+            child: MaterialApp(home: CandidateDetailPage(candidate: candidate)),
+          ),
+        );
+        await tester.pump();
+      }
+
+      await pump(
+        const Candidate(
+          id: 'b1',
+          category: CandidateCategory.gourmet,
+          name: 'テスト中華',
+          catchCopy: 'キャッチコピー',
+          reason: 'おすすめ理由',
+          walkMinutes: 3,
+          budget: '900円',
+        ),
+      );
+      expect(find.text('予算の目安(ディナー): 900円'), findsOneWidget);
+
+      await pump(candidateWithoutLocation);
+      expect(find.textContaining('予算の目安'), findsNothing);
+    });
+
+    testWidgets('名前の横に、ジャンルに合うドット絵のアイコンを出す', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
+            home: CandidateDetailPage(
+              candidate: Candidate(
+                id: 'b2',
+                category: CandidateCategory.sightseeing,
+                name: 'テスト水族館',
+                catchCopy: 'キャッチコピー',
+                reason: 'おすすめ理由',
+                walkMinutes: 3,
+                categoryName: 'Aquarium',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final icon = tester.widget<PixelIcon>(find.byType(PixelIcon));
+      expect(icon.kind, PixelIconKind.fish);
     });
 
     testWidgets('駅からの徒歩分数を表示する(直線距離からの概算なので「約」を付ける)', (tester) async {
@@ -176,7 +231,7 @@ void main() {
 
       // 画像URLなし。
       expect(find.byType(Image), findsNothing);
-      expect(find.byIcon(Icons.ramen_dining_rounded), findsOneWidget);
+      expect(find.byType(PixelIcon), findsOneWidget);
 
       // 画像URLはあるが、テスト環境ではネットワークに接続できず読み込みに失敗する。
       await tester.pumpWidget(
@@ -202,7 +257,7 @@ void main() {
       // 読み込みに失敗したら、空の枠は出さず、画像の部品ごと消える。名前の横の
       // カテゴリのアイコンだけが残る。
       expect(find.byType(Image), findsNothing);
-      expect(find.byIcon(Icons.park_rounded), findsOneWidget);
+      expect(find.byType(PixelIcon), findsOneWidget);
     });
 
     testWidgets('地図のタイルはAPIキー不要のOpenStreetMapを使う(CARTOは使わない)', (tester) async {

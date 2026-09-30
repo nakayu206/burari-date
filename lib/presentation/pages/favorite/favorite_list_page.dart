@@ -5,9 +5,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
-import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/favorite.dart';
 import '../../providers/favorite_providers.dart';
+import '../../widgets/pixel_icon.dart';
 
 /// お気に入り一覧画面。S-06で保存した候補を新しい順に表示する(仕様書 6.1 Favorite)。
 class FavoriteListPage extends ConsumerWidget {
@@ -74,12 +74,10 @@ class _FavoriteRow extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          favorite.category == CandidateCategory.gourmet
-              ? Icons.ramen_dining_rounded
-              : Icons.park_rounded,
-          size: AppSizes.iconMd,
-          color: AppColors.secondary,
+        GenreIcon(
+          category: favorite.category,
+          categoryName: favorite.categoryName,
+          size: 36,
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(

@@ -8,6 +8,8 @@ import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/domain/repositories/candidate_repository.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_list_page.dart';
+import 'package:burari_date/presentation/widgets/pixel_icon.dart';
+import 'package:burari_date/presentation/widgets/pixel_icon_data.dart';
 import 'package:burari_date/presentation/providers/candidate_providers.dart';
 
 void main() {
@@ -121,6 +123,48 @@ void main() {
 
       expect(fetchCounts[CandidateCategory.gourmet], 1);
       expect(fetchCounts[CandidateCategory.sightseeing], 1);
+    });
+
+    testWidgets('候補ごとに、ジャンルに合うアイコンと予算の目安を表示する', (tester) async {
+      const chinese = Candidate(
+        id: 'g1',
+        category: CandidateCategory.gourmet,
+        name: 'テスト中華',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 3,
+        categoryName: '中華',
+        budget: '900円',
+      );
+      const cafe = Candidate(
+        id: 'g2',
+        category: CandidateCategory.gourmet,
+        name: 'テストカフェ',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 5,
+        categoryName: 'カフェ・スイーツ',
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => [chinese, cafe],
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final kinds = tester
+          .widgetList<PixelIcon>(find.byType(PixelIcon))
+          .map((i) => i.kind)
+          .toList();
+      expect(kinds, [PixelIconKind.ramen, PixelIconKind.coffee]);
+      // 予算があるのは1件だけ。
+      expect(find.text('予算の目安 900円'), findsOneWidget);
+      expect(find.textContaining('予算の目安'), findsOneWidget);
     });
 
     testWidgets('キャッチコピーに「AI:」の接頭辞を付けない', (tester) async {
