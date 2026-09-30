@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -50,6 +51,20 @@ class CandidateDetailPage extends ConsumerWidget {
     return null;
   }
 
+  /// 候補自体の座標(取得できない場合はnull)。
+  LatLng? get _placePoint {
+    final lat = candidate.latitude;
+    final lng = candidate.longitude;
+    return lat != null && lng != null ? LatLng(lat, lng) : null;
+  }
+
+  /// 到着駅の座標(駅の情報がない、または座標がない場合はnull)。
+  LatLng? get _stationPoint {
+    final lat = fallbackStation?.latitude;
+    final lng = fallbackStation?.longitude;
+    return lat != null && lng != null ? LatLng(lat, lng) : null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = _location;
@@ -64,29 +79,29 @@ class CandidateDetailPage extends ConsumerWidget {
             vertical: AppSpacing.md,
           ),
           children: [
-            Container(
-              height: 130,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.secondary, width: 1.5),
-              ),
-              child: Icon(
-                candidate.category == CandidateCategory.gourmet
-                    ? Icons.ramen_dining_rounded
-                    : Icons.park_rounded,
-                size: 48,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              candidate.name,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: AppFontSizes.titleMedium,
-                fontWeight: FontWeight.bold,
-              ),
+            _CandidateImage(imageUrl: candidate.imageUrl),
+            // 名前は、ほかのアプリで検索するために、すぐコピーできるようにする。
+            Row(
+              children: [
+                _CategoryBadge(category: candidate.category),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    candidate.name,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: AppFontSizes.titleMedium,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _copyName(context),
+                  icon: const Icon(Icons.copy_rounded),
+                  color: AppColors.secondary,
+                  tooltip: '名前をコピー',
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
@@ -105,8 +120,18 @@ class CandidateDetailPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            if (location != null)
-              _CandidateMap(location: location, label: candidate.name)
+            _InfoRow(
+              icon: Icons.directions_walk_rounded,
+              // 直線距離からの概算(バックエンドで徒歩80m/分として計算)。
+              text: '駅から徒歩約${candidate.walkMinutes}分',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (_stationPoint != null || _placePoint != null)
+              _CandidateMap(
+                station: _stationPoint,
+                place: _placePoint,
+                label: candidate.name,
+              )
             else
               const _MapUnavailable(),
             // 住所を取得できない候補では、行ごと表示しない。
@@ -167,6 +192,14 @@ class CandidateDetailPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _copyName(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: candidate.name));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(const SnackBar(content: Text('名前をコピーしました')));
   }
 
   Future<void> _openDirections(BuildContext context, LatLng location) async {
@@ -231,51 +264,251 @@ class CandidateDetailPage extends ConsumerWidget {
   }
 }
 
-/// 地図表示(flutter_map + CARTOの無料タイル。APIキー・課金設定は不要)。
-/// Google Maps SDKはAPIキー発行・課金設定が別途必要なため(Issue #5コメント
-/// 参照)、無料で完結するこちらを採用した。
-class _CandidateMap extends StatelessWidget {
-  const _CandidateMap({required this.location, required this.label});
+/// アイコンと一行の情報(徒歩分数など)。
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.icon, required this.text});
 
-  final LatLng location;
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.secondary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: AppFontSizes.bodyMedium,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 候補の画像(ホットペッパー/Foursquareの写真)。
+///
+/// 写真がない・読み込みに失敗した場合は、空の枠を出さず、この部品ごと表示しない
+/// (観光は、Foursquareの写真が有料の項目のため、写真がないことが多い)。その
+/// 場合の目印は、名前の横のアイコン([_CategoryBadge])が担う。
+class _CandidateImage extends StatefulWidget {
+  const _CandidateImage({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  State<_CandidateImage> createState() => _CandidateImageState();
+}
+
+class _CandidateImageState extends State<_CandidateImage> {
+  static const _height = 180.0;
+
+  bool _hasFailed = false;
+
+  void _markFailed() {
+    if (_hasFailed) return;
+    // 画像の読み込み中(ビルドの途中)にsetStateしないよう、描画のあとに行う。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _hasFailed = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = widget.imageUrl;
+    if (url == null || _hasFailed) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: _height,
+          width: double.infinity,
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            // 読み込み中は、枠だけ先に出して、画面が跳ねないようにする。
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const ColoredBox(color: AppColors.primaryLight),
+            errorBuilder: (context, error, stackTrace) {
+              _markFailed();
+              return const ColoredBox(color: AppColors.primaryLight);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// カテゴリ(グルメ/観光)を示す、名前の横のアイコン。
+class _CategoryBadge extends StatelessWidget {
+  const _CategoryBadge({required this.category});
+
+  final CandidateCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.secondary, width: 1.5),
+      ),
+      child: Icon(
+        category == CandidateCategory.gourmet
+            ? Icons.ramen_dining_rounded
+            : Icons.park_rounded,
+        size: 24,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
+/// 「駅」と「場所」の位置関係を見せる地図(flutter_map + OpenStreetMapの標準
+/// タイル。APIキー・課金設定は不要)。
+///
+/// 駅からどこにあるかがひと目で分かるよう、駅と場所の両方が入る範囲に合わせて
+/// 表示する。標準タイルは色も情報も多く見づらいため、白に近い淡いグレーにして、
+/// 駅と場所のマーカーだけが目立つ、シンプルな見た目にする。
+///
+/// Google Maps SDKはAPIキー発行・課金設定が別途必要なため(Issue #5コメント
+/// 参照)、無料で完結するこちらを採用した。以前使っていたCARTOのベースマップは、
+/// APIキーが必要になり、タイルの代わりに「API KEY REQUIRED」の画像が返るよう
+/// になった(Issue #76)。OpenStreetMapの標準タイルサーバーは少量の利用向け
+/// (利用ポリシーあり)のため、利用者が増える段階では、APIキー付きの地図
+/// サービスへの切り替えを検討する。
+///
+/// [station]と[place]は、どちらか一方だけのこともある(場所の座標が取れない
+/// 候補は駅だけ、駅の情報がない場合は場所だけ)。少なくとも一方は必要。
+class _CandidateMap extends StatelessWidget {
+  const _CandidateMap({this.station, this.place, required this.label})
+    : assert(station != null || place != null);
+
+  /// 地図の色を淡くする色変換の行列。彩度を60%に落とし(輝度の重みは
+  /// 0.2126/0.7152/0.0722)、さらに全体を白に35%寄せる(255 × 0.35 ≒ 89)。
+  /// 完全なグレーにはせず、公園の緑や道の色をほんのり残す。
+  static const _paleMapMatrix = <double>[
+    0.4453, 0.1859, 0.0188, 0, 89.25, //
+    0.0553, 0.5760, 0.0188, 0, 89.25, //
+    0.0553, 0.1859, 0.4088, 0, 89.25, //
+    0, 0, 0, 1, 0, //
+  ];
+
+  /// 駅と場所が入るときの、地図の端との余白。
+  static const _fitPadding = EdgeInsets.all(26);
+
+  final LatLng? station;
+  final LatLng? place;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final points = [?station, ?place];
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         height: 160,
         child: FlutterMap(
-          options: MapOptions(initialCenter: location, initialZoom: 16),
+          options: MapOptions(
+            // 2点あるときは両方が入る範囲に合わせる。近い場所ほど、大きく
+            // 拡大される(拡大しすぎないよう、上限を付ける)。1点だけのときは
+            // その地点を中心にする。
+            initialCameraFit: points.length == 2
+                ? CameraFit.coordinates(
+                    coordinates: points,
+                    padding: _fitPadding,
+                    maxZoom: 18,
+                  )
+                : null,
+            initialCenter: points.first,
+            initialZoom: 17,
+            // 見せるだけの地図にする。操作できると、縦にスクロールする画面と
+            // 指の動きが競合して使いにくい。経路は「経路案内を開く」で見られる。
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
+            ),
+          ),
           children: [
             TileLayer(
-              urlTemplate:
-                  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              // 利用ポリシー上、アプリを識別できるUser-Agentを付ける。
               userAgentPackageName: 'com.buraridate.burari_date',
+              tileBuilder: (context, tileWidget, tile) => ColorFiltered(
+                colorFilter: const ColorFilter.matrix(_paleMapMatrix),
+                child: tileWidget,
+              ),
             ),
+            if (points.length == 2)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: points,
+                    strokeWidth: 2.5,
+                    color: AppColors.textSecondary,
+                    pattern: StrokePattern.dashed(segments: const [6, 6]),
+                  ),
+                ],
+              ),
             MarkerLayer(
               markers: [
-                Marker(
-                  point: location,
-                  width: 36,
-                  height: 36,
-                  child: Tooltip(
-                    message: label,
-                    child: const Icon(
-                      Icons.location_pin,
-                      color: AppColors.primary,
-                      size: 36,
+                if (station != null)
+                  Marker(
+                    point: station!,
+                    width: 30,
+                    height: 30,
+                    child: const Tooltip(
+                      message: '駅',
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.train_rounded,
+                          color: AppColors.surface,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                if (place != null)
+                  Marker(
+                    point: place!,
+                    width: 36,
+                    height: 36,
+                    // ピンの先が場所の位置を指すよう、下端を合わせる。
+                    alignment: Alignment.topCenter,
+                    child: Tooltip(
+                      message: label,
+                      child: const Icon(
+                        Icons.location_pin,
+                        color: AppColors.primary,
+                        size: 36,
+                      ),
+                    ),
+                  ),
               ],
             ),
-            const RichAttributionWidget(
+            RichAttributionWidget(
               attributions: [
-                TextSourceAttribution('OpenStreetMap contributors'),
-                TextSourceAttribution('CARTO'),
+                TextSourceAttribution(
+                  'OpenStreetMap contributors',
+                  onTap: () => launchUrl(
+                    Uri.parse('https://www.openstreetmap.org/copyright'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ],
             ),
           ],
