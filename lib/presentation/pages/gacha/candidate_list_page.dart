@@ -8,9 +8,11 @@ import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/gacha_result.dart';
 import '../../../domain/entities/station.dart';
 import '../../../domain/repositories/candidate_repository.dart';
+import '../../providers/auth_providers.dart';
 import '../../providers/candidate_providers.dart';
 import '../../widgets/pixel_icon.dart';
 import 'candidate_detail_page.dart';
+import 'limit_reached_view.dart';
 
 /// S-05 候補一覧画面(グルメ/観光タブ)
 class CandidateListPage extends ConsumerStatefulWidget {
@@ -113,30 +115,40 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
 
     return candidatesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      // タブを保持するため、失敗したときはここから取り直せるようにする。
-      error: (error, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _errorMessage(error),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: AppFontSizes.bodyMedium,
+      error: (error, _) {
+        // 利用上限は、再読み込みしても解消しないため、取り直しではなく、状況に
+        // 応じた案内(登録・課金・追加課金)を出す。
+        if (error is CandidateLimitException) {
+          return LimitReachedView(
+            error: error,
+            hasAccount: ref.watch(hasAccountProvider),
+          );
+        }
+        // タブを保持するため、失敗したときはここから取り直せるようにする。
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _errorMessage(error),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: AppFontSizes.bodyMedium,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              OutlinedButton(
-                onPressed: () => ref.invalidate(candidatesProvider(args)),
-                child: const Text('再読み込み'),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton(
+                  onPressed: () => ref.invalidate(candidatesProvider(args)),
+                  child: const Text('再読み込み'),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
       data: (candidates) => Column(
         children: [
           Expanded(
