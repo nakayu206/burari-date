@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
-import '../../../core/constants/app_train_colors.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/couple_silhouette.dart';
 import '../../widgets/station_silhouette.dart';
@@ -116,10 +115,7 @@ class _HomeIllustration extends StatelessWidget {
             Positioned(
               left: TrainIllustration.width + _gap,
               bottom: 14,
-              child: Opacity(
-                opacity: 0.45,
-                child: StationSilhouette(width: _stationWidth),
-              ),
+              child: StationSilhouette(width: _stationWidth),
             ),
             const Positioned(left: 0, bottom: 14, child: TrainIllustration()),
             // 電車と駅の間、ホーム上で待ち合わせる二人(デート感を出す)。
@@ -128,16 +124,57 @@ class _HomeIllustration extends StatelessWidget {
               bottom: 14,
               child: const CoupleSilhouette(width: _coupleWidth),
             ),
-            // 線路。
-            Positioned(
+            // 線路。車輪の接地位置(bottom: 14)にレール上端をそろえる。
+            const Positioned(
               left: 0,
               right: 0,
-              bottom: 10,
-              child: Container(height: 3, color: AppTrainColors.rail),
+              bottom: 8,
+              child: SizedBox(height: _Rail.height, child: _Rail()),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// レール・枕木・砂利をブロックで描いたドット絵の線路。
+class _Rail extends StatelessWidget {
+  const _Rail();
+
+  static const height = 6.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return const CustomPaint(painter: _RailPainter());
+  }
+}
+
+class _RailPainter extends CustomPainter {
+  const _RailPainter();
+
+  static const _rail = Color(0xFF77786C);
+  static const _sleeper = Color(0xFF8A5A2E);
+  static const _ballast = Color(0xFFD7C394);
+
+  /// 1ドットの大きさ。
+  static const _dot = 2.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+
+    void block(double x, double y, double w, double h, Color color) {
+      canvas.drawRect(Rect.fromLTWH(x, y, w, h), paint..color = color);
+    }
+
+    block(0, 0, size.width, _dot, _rail);
+    block(0, _dot * 2, size.width, _dot, _ballast);
+    for (var x = 0.0; x < size.width; x += _dot * 6) {
+      block(x, _dot, _dot * 3, _dot, _sleeper);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RailPainter oldDelegate) => false;
 }
