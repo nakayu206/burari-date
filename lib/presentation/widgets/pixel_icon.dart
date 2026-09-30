@@ -86,8 +86,12 @@ PixelIconKind pixelIconKindFor(CandidateCategory category, String? name) {
     if (has(['イタリアン', 'フレンチ', '洋食', 'ピザ'])) return PixelIconKind.pizza;
     if (has(['カフェ', '喫茶'])) return PixelIconKind.coffee;
     if (has(['スイーツ', 'ケーキ', 'デザート'])) return PixelIconKind.cake;
+    // 「バー・カクテル」は「バー」を含むため、ジョッキより先に判定する。
+    if (has(['カクテル'])) return PixelIconKind.cocktail;
     if (has(['居酒屋', 'バー', 'バル', 'ダイニング'])) return PixelIconKind.beer;
     if (has(['焼肉', 'ホルモン', 'ステーキ', '肉'])) return PixelIconKind.meat;
+    if (has(['カラオケ', 'パーティ'])) return PixelIconKind.mic;
+    if (has(['カレー', 'アジア', 'エスニック'])) return PixelIconKind.curry;
     return PixelIconKind.dining;
   }
 
@@ -106,5 +110,35 @@ PixelIconKind pixelIconKindFor(CandidateCategory category, String? name) {
     return PixelIconKind.onsen;
   }
   if (has(['garden', '庭園', '植物園', '花'])) return PixelIconKind.flower;
+  if (has(['karaoke', 'カラオケ'])) return PixelIconKind.mic;
+  if (has(['movie', 'cinema', 'film', '映画', 'シネマ'])) {
+    return PixelIconKind.movie;
+  }
+  if (has(['music', 'concert', '音楽', 'ライブ', 'コンサート'])) {
+    return PixelIconKind.music;
+  }
+  if (has(['zoo', '動物園'])) return PixelIconKind.paw;
+  if (has(['mountain', 'hiking', 'trail', '山', 'ハイキング'])) {
+    return PixelIconKind.mountain;
+  }
+  if (has(['castle', 'historic', 'landmark', '城', '史跡'])) {
+    return PixelIconKind.castle;
+  }
+  if (has(['beach', 'waterfront', 'ビーチ', '海'])) return PixelIconKind.beach;
+  if (has([
+    'stadium',
+    'sports',
+    'baseball',
+    'soccer',
+    'golf',
+    'bowling',
+    'スタジアム',
+    '球場',
+    'スポーツ',
+    'ボウリング',
+    'ゴルフ',
+  ])) {
+    return PixelIconKind.ball;
+  }
   return PixelIconKind.tree;
 }
