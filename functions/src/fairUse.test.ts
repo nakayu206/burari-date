@@ -40,6 +40,15 @@ test("上限に達していると、新しいガチャの取得は拒否する",
   );
 });
 
+test("上限のエラーは、種類(無料枠)を details に付けて返す", () => {
+  assert.throws(
+    () => planReservation(LIFETIME_FREE_LIMIT, undefined, "gourmet"),
+    (e: unknown) =>
+      (e as { details?: { limitType?: string } }).details?.limitType ===
+      "free_tier",
+  );
+});
+
 test("上限に達していても、数え済みのガチャの、もう一方のカテゴリは見られる", () => {
   assert.deepEqual(planReservation(LIFETIME_FREE_LIMIT, ["gourmet"], "sightseeing"), {
     charge: false,
