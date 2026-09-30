@@ -77,21 +77,58 @@ class _CandidateListPageState extends ConsumerState<CandidateListPage>
   }
 }
 
-class _CandidateListTab extends ConsumerWidget {
+class _CandidateListTab extends ConsumerStatefulWidget {
   const _CandidateListTab({required this.result, required this.category});
 
   final GachaResult result;
   final CandidateCategory category;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final candidatesAsync = ref.watch(
-      candidatesProvider((result: result, category: category)),
-    );
+  ConsumerState<_CandidateListTab> createState() => _CandidateListTabState();
+}
+
+/// TabBarViewは表示していないタブのWidgetを破棄するため、そのままだとタブを
+/// 切り替えるたびに候補を取り直す(AIの呼び出しと無料枠の消費が毎回発生する)。
+/// 一度取得した候補は同じガチャ結果の間は変わらないので、タブを保持する。
+class _CandidateListTabState extends ConsumerState<_CandidateListTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final result = widget.result;
+    final category = widget.category;
+    final args = (result: result, category: category);
+    final candidatesAsync = ref.watch(candidatesProvider(args));
 
     return candidatesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('候補の取得に失敗しました: $error')),
+      // タブを保持するため、失敗したときはここから取り直せるようにする。
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '候補の取得に失敗しました: $error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.bodyMedium,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              OutlinedButton(
+                onPressed: () => ref.invalidate(candidatesProvider(args)),
+                child: const Text('再読み込み'),
+              ),
+            ],
+          ),
+        ),
+      ),
       data: (candidates) => Column(
         children: [
           Expanded(
@@ -192,7 +229,7 @@ class _CandidateListView extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'AI: ${candidate.catchCopy}',
+                        candidate.catchCopy,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: AppFontSizes.labelSmall,

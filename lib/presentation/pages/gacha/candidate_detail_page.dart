@@ -90,7 +90,7 @@ class CandidateDetailPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'AI: ${candidate.catchCopy}',
+              candidate.catchCopy,
               style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: AppFontSizes.labelSmall,
