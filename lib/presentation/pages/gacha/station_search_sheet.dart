@@ -15,6 +15,9 @@ import '../../providers/station_providers.dart';
 /// (docs/デザイントークン.md参照)。
 const _kGap = AppSpacing.lg;
 
+/// 検索欄の入力文字を、左のアイコンと同じ高さにそろえるための下方向のずらし量。
+const _kTextOffsetY = 4.0;
+
 /// S-02b 出発駅検索(サジェスト)。S-02 の出発駅欄タップでモーダル表示する。
 Future<Station?> showStationSearchSheet(BuildContext context) {
   return showModalBottomSheet<Station>(
@@ -131,28 +134,29 @@ class _StationSearchSheetState extends ConsumerState<_StationSearchSheet> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    // 入力欄の高さいっぱいに広げて縦中央に置く。既定のままだと
-                    // 文字がアイコンより少し上に寄る。
-                    expands: true,
-                    maxLines: null,
-                    textAlignVertical: TextAlignVertical.center,
-                    onChanged: _onChanged,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: AppFontSizes.bodyLarge,
-                    ),
-                    // 枠と塗りは外側のContainerが担う。テーマのenabled/focusedBorder・
-                    // filledが優先されて二重に見えるため、ここでは全て無効にする。
-                    decoration: const InputDecoration(
-                      isCollapsed: true,
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      hintText: '駅名・路線名を入力',
+                  // 日本語フォントの上下の余白の関係で、文字がアイコンより少し
+                  // 上に寄るため、描画だけ下にずらして高さをそろえる。
+                  // (expands: trueで広げると、入力した文字が枠の外に切れる)
+                  child: Transform.translate(
+                    offset: const Offset(0, _kTextOffsetY),
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      onChanged: _onChanged,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: AppFontSizes.bodyLarge,
+                      ),
+                      // 枠と塗りは外側のContainerが担う。テーマのenabled/focusedBorder・
+                      // filledが優先されて二重に見えるため、ここでは全て無効にする。
+                      decoration: const InputDecoration(
+                        isCollapsed: true,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        hintText: '駅名・路線名を入力',
+                      ),
                     ),
                   ),
                 ),
