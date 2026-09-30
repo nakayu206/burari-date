@@ -16,6 +16,29 @@ class CandidateFetchException implements Exception {
   String toString() => message;
 }
 
+/// 上限の種類。
+enum LimitKind {
+  /// 無料枠(累計10回)を使い切った。
+  freeTier,
+
+  /// 課金後の月のフェアユース上限(月30回目安)を超えた。バックエンドには
+  /// まだ実装していない(Issue #10)が、案内を分岐できるよう、種類だけ持つ。
+  monthly,
+}
+
+/// 利用上限に達して、候補を取得できなかったことを表す例外。
+///
+/// 上限の種類([kind])によって、画面が出す案内(登録・課金・追加課金)を分ける。
+/// 再読み込みしても解消しないため、画面は「再読み込み」を出さない。
+class CandidateLimitException extends CandidateFetchException {
+  const CandidateLimitException(
+    super.message, {
+    this.kind = LimitKind.freeTier,
+  });
+
+  final LimitKind kind;
+}
+
 /// 到着駅周辺のグルメ/観光候補を取得する(仕様書 5章 AI連携仕様)。
 ///
 /// バックエンド(Firebase Functions)経由で店舗/観光地API(ホットペッパー

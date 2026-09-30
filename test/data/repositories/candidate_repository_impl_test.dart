@@ -52,6 +52,76 @@ void main() {
       expect(result.single.latitude, 35.691);
     });
 
+    group('上限のエラー', () {
+      CandidateRepositoryImpl failingWith(
+        String code, {
+        Object? details,
+        String message = '上限に達しました',
+      }) {
+        return CandidateRepositoryImpl(
+          callable: (data) async => throw FirebaseFunctionsException(
+            message: message,
+            code: code,
+            details: details,
+          ),
+        );
+      }
+
+      Future<Object> errorOf(CandidateRepositoryImpl repository) async {
+        try {
+          await repository.getCandidates(
+            arrival,
+            CandidateCategory.gourmet,
+            gachaId: 'g1',
+          );
+        } catch (e) {
+          return e;
+        }
+        fail('例外が投げられなかった');
+      }
+
+      test('無料枠の上限は、種類つきの専用の例外にする', () async {
+        final error = await errorOf(
+          failingWith(
+            'resource-exhausted',
+            details: {'limitType': 'free_tier'},
+          ),
+        );
+
+        expect(error, isA<CandidateLimitException>());
+        expect((error as CandidateLimitException).kind, LimitKind.freeTier);
+        expect(error.message, '上限に達しました');
+      });
+
+      test('月の上限は、monthlyの種類にする', () async {
+        final error = await errorOf(
+          failingWith('resource-exhausted', details: {'limitType': 'monthly'}),
+        );
+
+        expect((error as CandidateLimitException).kind, LimitKind.monthly);
+      });
+
+      test('種類が取れない(古いバックエンドなど)場合は、無料枠の上限として扱う', () async {
+        final noDetails = await errorOf(failingWith('resource-exhausted'));
+        final unknownType = await errorOf(
+          failingWith('resource-exhausted', details: {'limitType': 'x'}),
+        );
+
+        expect((noDetails as CandidateLimitException).kind, LimitKind.freeTier);
+        expect(
+          (unknownType as CandidateLimitException).kind,
+          LimitKind.freeTier,
+        );
+      });
+
+      test('上限以外のエラーは、上限の例外にしない(再読み込みで取り直せる)', () async {
+        final error = await errorOf(failingWith('unavailable'));
+
+        expect(error, isA<CandidateFetchException>());
+        expect(error, isNot(isA<CandidateLimitException>()));
+      });
+    });
+
     test('ジャンル名と予算の目安があればCandidateに含め、なければnullにする', () async {
       final repository = CandidateRepositoryImpl(
         callable: (data) async => {
