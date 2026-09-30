@@ -5,6 +5,7 @@ import 'package:burari_date/data/repositories/candidate_repository_impl.dart';
 import 'package:burari_date/domain/entities/ai_preference.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/station.dart';
+import 'package:burari_date/domain/repositories/candidate_repository.dart';
 
 void main() {
   group('CandidateRepositoryImpl', () {
@@ -142,11 +143,14 @@ void main() {
       await expectLater(
         repository.getCandidates(arrival, CandidateCategory.gourmet),
         throwsA(
-          isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('今月の利用上限に達しました'),
-          ),
+          isA<CandidateFetchException>()
+              .having((e) => e.message, 'message', '今月の利用上限に達しました。来月またご利用ください')
+              // 画面に出る文字列に、「Exception:」などの内部の表記が付かない。
+              .having(
+                (e) => e.toString(),
+                'toString',
+                '今月の利用上限に達しました。来月またご利用ください',
+              ),
         ),
       );
     });

@@ -31,6 +31,22 @@ class _RecordingCandidateRepository implements CandidateRepository {
   }
 }
 
+/// 最初の1回だけ失敗し、2回目からは成功するリポジトリ。
+class _FailingOnceCandidateRepository implements CandidateRepository {
+  int callCount = 0;
+
+  @override
+  Future<List<Candidate>> getCandidates(
+    Station arrival,
+    CandidateCategory category, {
+    AiPreference? preference,
+  }) async {
+    callCount++;
+    if (callCount == 1) throw const CandidateFetchException('失敗');
+    return const [];
+  }
+}
+
 /// 好み設定の読み込みだけ失敗するリポジトリ。
 class _FailingLoadSettingsRepository implements SettingsRepository {
   @override
@@ -103,6 +119,67 @@ void main() {
       repository.receivedPreference,
       const AiPreference(genres: {'中華'}, budget: '安め', mood: '賑やか'),
     );
+  });
+
+  test('画面を離れて開き直しても、同じガチャ結果の候補は取り直さない', () async {
+    final repository = _RecordingCandidateRepository();
+    final container = ProviderContainer(
+      overrides: [candidateRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    // 画面を開いて取得し、閉じる(購読を外す)。
+    final subscription = container.listen(candidatesProvider(args), (_, _) {});
+    await container.read(candidatesProvider(args).future);
+    subscription.close();
+    await Future<void>.delayed(Duration.zero);
+
+    // もう一度開く。
+    final reopened = container.listen(candidatesProvider(args), (_, _) {});
+    await container.read(candidatesProvider(args).future);
+    reopened.close();
+
+    expect(repository.callCount, 1);
+  });
+
+  test('カテゴリが違えば別に取得する', () async {
+    final repository = _RecordingCandidateRepository();
+    final container = ProviderContainer(
+      overrides: [candidateRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(candidatesProvider(args).future);
+    await container.read(
+      candidatesProvider((
+        result: result,
+        category: CandidateCategory.sightseeing,
+      )).future,
+    );
+
+    expect(repository.callCount, 2);
+  });
+
+  test('取得に失敗した結果は保持せず、開き直したときに取り直す', () async {
+    final repository = _FailingOnceCandidateRepository();
+    final container = ProviderContainer(
+      overrides: [candidateRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final first = container.listen(candidatesProvider(args), (_, _) {});
+    await expectLater(
+      container.read(candidatesProvider(args).future),
+      throwsException,
+    );
+    first.close();
+    await Future<void>.delayed(Duration.zero);
+
+    final second = container.listen(candidatesProvider(args), (_, _) {});
+    await container.read(candidatesProvider(args).future);
+    second.close();
+
+    expect(repository.callCount, 2);
   });
 
   test('好み設定の読み込みに失敗しても、好みなしで候補の取得を続ける', () async {
