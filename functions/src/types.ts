@@ -9,6 +9,8 @@ export interface RawPlace {
   latitude?: number;
   longitude?: number;
   categoryName?: string;
+  /** 予算の目安(ホットペッパーの平均ディナー予算。飲食店のみ) */
+  budget?: string;
 }
 
 /** クライアントの Candidate エンティティと対応するレスポンス形式 */
@@ -23,4 +25,8 @@ export interface Candidate {
   imageUrl?: string;
   latitude?: number;
   longitude?: number;
+  /** ジャンル名(ホットペッパーのジャンル、Foursquareのカテゴリ)。アイコンの出し分けに使う */
+  categoryName?: string;
+  /** 予算の目安(飲食店のみ) */
+  budget?: string;
 }

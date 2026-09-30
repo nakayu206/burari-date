@@ -75,6 +75,8 @@ export function toCandidates(
         imageUrl: place.imageUrl,
         latitude: place.latitude,
         longitude: place.longitude,
+        categoryName: place.categoryName,
+        budget: place.budget,
       };
       return candidate;
     })
@@ -104,7 +106,11 @@ export function buildPreferenceNote(
 ユーザーの好み(${items.join(" / ")})に合いそうな場所を優先して選び、結果の上位(先頭)に並べてください。
 ただし好みに合う場所が少ない場合は、他の場所も選んで構いません。
 好みに合うかどうかは、与えられたデータ(店名・カテゴリなど)から推測できる範囲で判断し、
-価格や雰囲気など、データにない事実は断定して書かないでください。
+価格や雰囲気など、データにない事実は断定して書かないでください。${
+    category === "gourmet" && preference.budget
+      ? "\n予算感は、データのbudget(平均ディナー予算の目安)から判断してください。"
+      : ""
+  }
 `;
 }
 
@@ -124,6 +130,7 @@ export function buildPrompt(
     name: place.name,
     address: place.address ?? null,
     category: place.categoryName ?? null,
+    budget: place.budget ?? null,
   }));
 
   return `あなたは日本のデートスポット案内アシスタントです。

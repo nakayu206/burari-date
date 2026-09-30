@@ -134,3 +134,24 @@ test("プロンプトで、好みに合う場所を結果の上位に並べる�
   const prompt = buildPrompt("新宿駅", "gourmet", places, { genres: ["中華"] });
   assert.ok(prompt.includes("結果の上位(先頭)に並べてください"));
 });
+
+test("グルメで予算感の好みがあるときは、データのbudgetで判断する指示を加える", () => {
+  const note = buildPreferenceNote("gourmet", { genres: [], budget: "安め" });
+  assert.ok(note.includes("データのbudget"));
+});
+
+test("観光や、予算感の好みがないときは、budgetの指示を加えない", () => {
+  assert.ok(
+    !buildPreferenceNote("sightseeing", { genres: [], budget: "安め" }).includes("budget"),
+  );
+  assert.ok(
+    !buildPreferenceNote("gourmet", { genres: ["和食"] }).includes("budget"),
+  );
+});
+
+test("AIに渡すデータに、予算の目安を含める", () => {
+  const prompt = buildPrompt("新宿駅", "gourmet", [
+    { id: "a", name: "テスト食堂", budget: "900円", categoryName: "和食" },
+  ]);
+  assert.ok(prompt.includes('"budget":"900円"'));
+});
