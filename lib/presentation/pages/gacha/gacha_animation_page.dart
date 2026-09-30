@@ -704,13 +704,10 @@ class _Stars extends StatelessWidget {
               Positioned(
                 left: constraints.maxWidth * p.dx,
                 top: constraints.maxHeight * p.dy,
-                child: Container(
-                  width: 3,
-                  height: 3,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+                child: const SizedBox(
+                  width: 4,
+                  height: 4,
+                  child: ColoredBox(color: Colors.white),
                 ),
               ),
           ],
@@ -772,14 +769,10 @@ class _SkySceneState extends State<_SkyScene> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: _palette.gradientColors,
-          stops: _palette.gradientStops,
-        ),
+    return CustomPaint(
+      painter: _SkyBandsPainter(
+        colors: _palette.gradientColors,
+        stops: _palette.gradientStops,
       ),
       child: Stack(
         children: [
@@ -809,7 +802,7 @@ class _SkySceneState extends State<_SkyScene> with TickerProviderStateMixin {
               right: 70 + (1 - _cloudDrift.value) * 20,
               child: child!,
             ),
-            child: _Cloud(width: 44, color: _palette.cloudColor),
+            child: _Cloud(width: 42, color: _palette.cloudColor),
           ),
           Positioned(
             left: 0,
@@ -867,6 +860,45 @@ class _SkySceneState extends State<_SkyScene> with TickerProviderStateMixin {
   }
 }
 
+/// 空を階段状の色帯で塗る。グラデーションの代わりに、時間帯の配色を一定の
+/// 高さごとの単色に量子化して、ドット絵の空にする。
+class _SkyBandsPainter extends CustomPainter {
+  const _SkyBandsPainter({required this.colors, required this.stops});
+
+  final List<Color> colors;
+  final List<double> stops;
+
+  static const _bandHeight = 12.0;
+
+  Color _colorAt(double t) {
+    for (var i = 1; i < stops.length; i++) {
+      if (t <= stops[i]) {
+        final span = stops[i] - stops[i - 1];
+        return Color.lerp(colors[i - 1], colors[i], (t - stops[i - 1]) / span)!;
+      }
+    }
+    return colors.last;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+    for (var y = 0.0; y < size.height; y += _bandHeight) {
+      paint.color = _colorAt((y + _bandHeight / 2) / size.height);
+      canvas.drawRect(
+        Rect.fromLTWH(0, y, size.width, _bandHeight + 0.5),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SkyBandsPainter oldDelegate) =>
+      oldDelegate.colors != colors || oldDelegate.stops != stops;
+}
+
+/// 太陽・月。円を4pxのマスで塗った階段状の円盤にし、外側に淡い1マス分の
+/// 光の輪を添える。月は円盤の一部をくり抜いて三日月にする。
 class _Sun extends StatelessWidget {
   const _Sun({
     this.color = const Color(0xFFF2C230),
@@ -878,77 +910,135 @@ class _Sun extends StatelessWidget {
   final Color glowColor;
   final bool isMoon;
 
+  static const _cell = 4.0;
+
   @override
   Widget build(BuildContext context) {
-    // 夜は月なので一回り小さく、光の広がりも控えめにする。
-    final size = isMoon ? 38.0 : 48.0;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: glowColor.withValues(alpha: isMoon ? 0.3 : 0.45),
-            blurRadius: isMoon ? 14 : 20,
-            spreadRadius: isMoon ? 2 : 4,
-          ),
-        ],
+    // 夜は月なので一回り小さくする。光の輪の分だけ外側に余白を取る。
+    final cells = isMoon ? 11 : 14;
+    return SizedBox(
+      width: cells * _cell,
+      height: cells * _cell,
+      child: CustomPaint(
+        painter: _SunPainter(
+          cells: cells,
+          color: color,
+          glowColor: glowColor,
+          isMoon: isMoon,
+        ),
       ),
     );
   }
 }
 
-/// 雲(丸みを帯びた矩形2つを重ねた簡易シルエット)。時間帯に応じて色を変える。
+class _SunPainter extends CustomPainter {
+  const _SunPainter({
+    required this.cells,
+    required this.color,
+    required this.glowColor,
+    required this.isMoon,
+  });
+
+  final int cells;
+  final Color color;
+  final Color glowColor;
+  final bool isMoon;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+    final cell = size.width / cells;
+    final center = (cells - 1) / 2;
+    final radius = cells / 2 - 1.5;
+    final glowRadius = radius + 1.5;
+    // 三日月のくり抜き用の円(右上にずらす)。
+    final cutX = center + 2.2;
+    final cutY = center - 2.2;
+    final cutRadius = radius * 0.85;
+
+    for (var iy = 0; iy < cells; iy++) {
+      for (var ix = 0; ix < cells; ix++) {
+        final dx = ix - center;
+        final dy = iy - center;
+        final dist = sqrt(dx * dx + dy * dy);
+        if (dist > glowRadius) continue;
+        if (dist > radius) {
+          paint.color = glowColor.withValues(alpha: isMoon ? 0.25 : 0.35);
+        } else {
+          if (isMoon) {
+            final cx = ix - cutX;
+            final cy = iy - cutY;
+            if (sqrt(cx * cx + cy * cy) < cutRadius) continue;
+          }
+          paint.color = color;
+        }
+        canvas.drawRect(Rect.fromLTWH(ix * cell, iy * cell, cell, cell), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SunPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.glowColor != glowColor ||
+      oldDelegate.isMoon != isMoon;
+}
+
+/// 雲(14×4マスのドット絵)。時間帯に応じて色を変え、最下段だけ少し暗くして
+/// 厚みを出す。`width`は14の倍数にすると、マスがきれいな整数pxになる。
 class _Cloud extends StatelessWidget {
   const _Cloud({required this.width, this.color = Colors.white});
 
   final double width;
   final Color color;
 
+  static const _pattern = [
+    '.....XXXX.....',
+    '..XX.XXXXXX...',
+    '.XXXXXXXXXXXX.',
+    'XXXXXXXXXXXXXX',
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final height = width * 0.5;
+    final cell = width / _pattern.first.length;
     return SizedBox(
       width: width,
-      height: height,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            bottom: 0,
-            child: Container(
-              width: width * 0.6,
-              height: height * 0.7,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(height),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              width: width * 0.7,
-              height: height * 0.85,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(height),
-              ),
-            ),
-          ),
-        ],
-      ),
+      height: cell * _pattern.length,
+      child: CustomPaint(painter: _CloudPainter(color)),
     );
   }
 }
 
-/// 遠くの山並みのシルエット。
-/// 遠くの山並みのシルエット。正弦波ベースの波形にして、継ぎ目なく連続で
-/// 左にスクロールさせられるようにしている(ユーザーフィードバック:
-/// 「背景が流れてる感じになってないから動いてるように見えない」)。
+class _CloudPainter extends CustomPainter {
+  const _CloudPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+    final cell = size.width / _Cloud._pattern.first.length;
+    final shade = Color.lerp(color, Colors.black, 0.1)!;
+    for (var iy = 0; iy < _Cloud._pattern.length; iy++) {
+      final row = _Cloud._pattern[iy];
+      paint.color = iy == _Cloud._pattern.length - 1 ? shade : color;
+      for (var ix = 0; ix < row.length; ix++) {
+        if (row[ix] != 'X') continue;
+        canvas.drawRect(Rect.fromLTWH(ix * cell, iy * cell, cell, cell), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CloudPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// 遠くの山並みのシルエット。正弦波ベースの波形を6pxのマスに量子化して
+/// 階段状にし、継ぎ目なく連続で左にスクロールさせられるようにしている
+/// (ユーザーフィードバック:「背景が流れてる感じになってないから動いてる
+/// ように見えない」)。
 class _Hills extends StatelessWidget {
   const _Hills({required this.phase, this.color = const Color(0xFFAFC08C)});
 
@@ -972,20 +1062,19 @@ class _HillsPainter extends CustomPainter {
 
   static const _period = 160.0;
   static const _amplitude = 18.0;
+  static const _cell = 6.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path()..moveTo(0, size.height);
-    for (var x = 0.0; x <= size.width; x += 4) {
-      final y =
-          size.height * 0.4 - _amplitude * sin((x / _period) * 2 * pi + phase);
-      path.lineTo(x, y);
+    final paint = Paint()
+      ..isAntiAlias = false
+      ..color = color;
+    for (var x = 0.0; x < size.width; x += _cell) {
+      final wave = sin(((x + _cell / 2) / _period) * 2 * pi + phase);
+      final y = size.height * 0.4 - _amplitude * wave;
+      final top = (y / _cell).round() * _cell;
+      canvas.drawRect(Rect.fromLTRB(x, top, x + _cell, size.height), paint);
     }
-    path
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(path, paint);
   }
 
   @override
@@ -993,7 +1082,7 @@ class _HillsPainter extends CustomPainter {
       oldDelegate.phase != phase || oldDelegate.color != color;
 }
 
-/// レール1本。地面(こげ茶)から浮き上がって見えるよう金属色にし、上端に明るいハイライトを重ねて立体感を出す。
+/// レール1本。地面(こげ茶)から浮き上がって見えるよう金属色にし、上端に明るいハイライトを重ねて立体感を出す(2pxのドット単位)。
 class _Rail extends StatelessWidget {
   const _Rail();
 
@@ -1002,20 +1091,21 @@ class _Rail extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(height: 1.5, color: const Color(0xFFD8DCDD)),
-        Container(height: 3.5, color: const Color(0xFF6B7176)),
+        Container(height: 2, color: const Color(0xFFD8DCDD)),
+        Container(height: 4, color: const Color(0xFF6B7176)),
       ],
     );
   }
 }
 
 /// 線路の枕木(2本のレールの間を渡す木製の板)。左に流れているように見せるためスクロールさせる。
+/// 角の丸みは付けず、位置も整数pxに丸めてドット絵の見た目をそろえる。
 class _ScrollingSleepers extends StatelessWidget {
   const _ScrollingSleepers({required this.progress});
 
   final double progress;
 
-  static const _period = 26.0;
+  static const _period = 24.0;
   static const _tieWidth = 12.0;
 
   @override
@@ -1025,7 +1115,7 @@ class _ScrollingSleepers extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final count = (constraints.maxWidth / _period).ceil() + 2;
-          final baseOffset = -progress * _period;
+          final baseOffset = (-progress * _period).floorToDouble();
           return Stack(
             clipBehavior: Clip.hardEdge,
             children: [
@@ -1034,11 +1124,16 @@ class _ScrollingSleepers extends StatelessWidget {
                   left: baseOffset + i * _period,
                   top: 0,
                   bottom: 0,
-                  child: Container(
+                  child: const SizedBox(
                     width: _tieWidth,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6B4A2E),
-                      borderRadius: BorderRadius.circular(1.5),
+                    child: Column(
+                      children: [
+                        Expanded(child: ColoredBox(color: Color(0xFF6B4A2E))),
+                        SizedBox(
+                          height: 2,
+                          child: ColoredBox(color: Color(0xFF4F3520)),
+                        ),
+                      ],
                     ),
                   ),
                 ),
