@@ -56,5 +56,41 @@ void main() {
       expect(restored.address, isNull);
       expect(restored.latitude, isNull);
     });
+
+    test('ジャンル名と予算の目安を、候補から複製し、保存・復元しても保つ', () {
+      const candidate = Candidate(
+        id: 'c1',
+        category: CandidateCategory.gourmet,
+        name: 'テスト中華',
+        catchCopy: 'キャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 3,
+        categoryName: '中華',
+        budget: '900円',
+      );
+
+      final favorite = Favorite.fromCandidate(candidate);
+      final restored = Favorite.fromJson(favorite.toJson());
+
+      expect(favorite.categoryName, '中華');
+      expect(favorite.budget, '900円');
+      expect(restored.categoryName, '中華');
+      expect(restored.budget, '900円');
+    });
+
+    test('ジャンル名・予算がない保存済みの古いデータも読み込める', () {
+      final restored = Favorite.fromJson({
+        'candidateId': 'c1',
+        'category': 'gourmet',
+        'name': 'テスト洋食屋',
+        'catchCopy': 'キャッチコピー',
+        'reason': 'おすすめ理由',
+        'walkMinutes': 3,
+        'savedAt': DateTime(2026, 9, 18).toIso8601String(),
+      });
+
+      expect(restored.categoryName, isNull);
+      expect(restored.budget, isNull);
+    });
   });
 }

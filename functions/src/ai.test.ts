@@ -69,3 +69,16 @@ test("存在しないindexは無視する", () => {
   );
   assert.deepEqual(candidates, []);
 });
+
+test("候補に、ジャンル名と予算の目安を引き継ぐ", () => {
+  const targets = [
+    { id: "a", name: "a", categoryName: "中華", budget: "900円" },
+  ];
+  const [candidate] = toCandidates(
+    [{ index: 0, catchCopy: "c", reason: "r" }],
+    targets,
+    "gourmet",
+  );
+  assert.equal(candidate.categoryName, "中華");
+  assert.equal(candidate.budget, "900円");
+});

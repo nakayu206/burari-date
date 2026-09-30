@@ -52,6 +52,42 @@ void main() {
       expect(result.single.latitude, 35.691);
     });
 
+    test('ジャンル名と予算の目安があればCandidateに含め、なければnullにする', () async {
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async => {
+          'candidates': [
+            {
+              'id': 'shop1',
+              'name': '中華飯店',
+              'catchCopy': 'c',
+              'reason': 'r',
+              'walkMinutes': 4,
+              'categoryName': '中華',
+              'budget': '900円',
+            },
+            {
+              'id': 'shop2',
+              'name': '公園',
+              'catchCopy': 'c',
+              'reason': 'r',
+              'walkMinutes': 2,
+            },
+          ],
+        },
+      );
+
+      final result = await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
+
+      expect(result[0].categoryName, '中華');
+      expect(result[0].budget, '900円');
+      expect(result[1].categoryName, isNull);
+      expect(result[1].budget, isNull);
+    });
+
     test('到着駅の緯度・経度・駅名・カテゴリをリクエストに渡す', () async {
       Map<String, dynamic>? capturedData;
       final repository = CandidateRepositoryImpl(

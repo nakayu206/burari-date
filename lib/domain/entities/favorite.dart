@@ -17,6 +17,8 @@ class Favorite {
     this.imageUrl,
     this.latitude,
     this.longitude,
+    this.categoryName,
+    this.budget,
   });
 
   factory Favorite.fromCandidate(Candidate candidate) {
@@ -32,6 +34,8 @@ class Favorite {
       imageUrl: candidate.imageUrl,
       latitude: candidate.latitude,
       longitude: candidate.longitude,
+      categoryName: candidate.categoryName,
+      budget: candidate.budget,
     );
   }
 
@@ -48,6 +52,9 @@ class Favorite {
       imageUrl: json['imageUrl'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      // 保存済みの古いデータにはないため、nullを許す。
+      categoryName: json['categoryName'] as String?,
+      budget: json['budget'] as String?,
     );
   }
 
@@ -64,6 +71,8 @@ class Favorite {
   final String? imageUrl;
   final double? latitude;
   final double? longitude;
+  final String? categoryName;
+  final String? budget;
 
   Map<String, dynamic> toJson() {
     return {
@@ -78,6 +87,8 @@ class Favorite {
       'imageUrl': imageUrl,
       'latitude': latitude,
       'longitude': longitude,
+      'categoryName': categoryName,
+      'budget': budget,
     };
   }
 }

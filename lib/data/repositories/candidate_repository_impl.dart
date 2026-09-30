@@ -84,6 +84,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
       imageUrl: json['imageUrl'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      categoryName: json['categoryName'] as String?,
+      budget: json['budget'] as String?,
     );
   }
 }

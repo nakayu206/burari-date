@@ -14,6 +14,8 @@ class Candidate {
     this.imageUrl,
     this.latitude,
     this.longitude,
+    this.categoryName,
+    this.budget,
   });
 
   final String id;
@@ -33,4 +35,11 @@ class Candidate {
   /// 到着駅の座標をフォールバックとして表示する。
   final double? latitude;
   final double? longitude;
+
+  /// ジャンル名(ホットペッパーのジャンル、Foursquareのカテゴリ)。一覧・詳細の
+  /// アイコンの出し分けに使う。取得できない場合はnull。
+  final String? categoryName;
+
+  /// 予算の目安(ホットペッパーの平均ディナー予算。飲食店のみ)。
+  final String? budget;
 }

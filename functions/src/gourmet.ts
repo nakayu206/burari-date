@@ -15,6 +15,7 @@ interface RawHotPepperShop {
   lat?: number;
   lng?: number;
   genre?: { name?: string };
+  budget?: { name?: string; average?: string };
   photo?: { pc?: { l?: string } };
 }
 
@@ -51,5 +52,19 @@ function toRawPlace(shop: RawHotPepperShop): RawPlace {
     latitude: shop.lat,
     longitude: shop.lng,
     categoryName: shop.genre?.name,
+    budget: toBudgetText(shop.budget),
   };
+}
+
+/**
+ * 予算の目安の文言を作る。平均ディナー予算(average。「900円」など)を優先し、
+ * ない店は予算の帯(name。「1001~1500円」など)を使う。どちらもなければundefined。
+ */
+export function toBudgetText(
+  budget: { name?: string; average?: string } | undefined,
+): string | undefined {
+  const average = budget?.average?.trim();
+  if (average) return average;
+  const name = budget?.name?.trim();
+  return name ? name : undefined;
 }
