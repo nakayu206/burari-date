@@ -53,6 +53,45 @@ void main() {
       expect(find.text('経路案内を開く'), findsNothing);
     });
 
+    testWidgets('住所がある候補は住所を表示する', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
+            home: CandidateDetailPage(
+              candidate: Candidate(
+                id: 'c2',
+                category: CandidateCategory.gourmet,
+                name: 'テスト洋食屋',
+                catchCopy: 'キャッチコピー',
+                reason: 'おすすめ理由',
+                walkMinutes: 3,
+                address: '東京都新宿区1-1-1',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('住所: 東京都新宿区1-1-1'), findsOneWidget);
+    });
+
+    testWidgets('住所が無い候補は、住所の行も開発用メッセージも表示しない', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
+            home: CandidateDetailPage(candidate: candidateWithoutLocation),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('住所'), findsNothing);
+      expect(find.textContaining('外部API'), findsNothing);
+    });
+
     testWidgets('候補自体に座標が無くても、到着駅の座標をフォールバックとして地図を表示する', (tester) async {
       const station = Station(
         id: 's1',
