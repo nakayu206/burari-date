@@ -61,6 +61,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   fake_cloud_firestore: ^4.3.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -101,3 +103,26 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# アプリアイコン(dart run flutter_launcher_icons)
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/icon.png
+  remove_alpha_ios: true
+  adaptive_icon_background: "#F3EEDC"
+  adaptive_icon_foreground: assets/images/icon.png
+  adaptive_icon_foreground_inset: 20
+
+# スプラッシュ(dart run flutter_native_splash:create)。背景はアプリ背景色(AppColors.background)に合わせる
+flutter_native_splash:
+  color: "#F3EEDC"
+  color_dark: "#F3EEDC"
+  image: assets/images/icon.png
+  image_dark: assets/images/icon.png
+  android_12:
+    color: "#F3EEDC"
+    color_dark: "#F3EEDC"
+    image: assets/images/splash_android12.png
+    icon_background_color: "#F3EEDC"
+    icon_background_color_dark: "#F3EEDC"
