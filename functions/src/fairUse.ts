@@ -7,6 +7,14 @@ import { HttpsError } from "firebase-functions/v2/https";
  */
 export const LIFETIME_FREE_LIMIT = 10;
 
+/**
+ * 上限エラーの種類。
+ * - `free_tier`: 無料枠(累計10回)を使い切った
+ * - `monthly`: 課金後の月のフェアユース上限(月30回目安)を超えた。まだ実装して
+ *   いない(Issue #10)が、アプリが分岐できるよう、値だけ先に決めている。
+ */
+export type LimitType = "free_tier" | "monthly";
+
 /** ガチャごとの取得記録を残す日数(TTLポリシーを設定したときに古い記録を消す目安) */
 const GACHA_USAGE_TTL_DAYS = 30;
 
@@ -53,6 +61,8 @@ export function planReservation(
     throw new HttpsError(
       "resource-exhausted",
       `無料利用の上限(${LIFETIME_FREE_LIMIT}回)に達しました。継続利用にはアカウント登録と課金が必要です。`,
+      // アプリが、上限の種類に応じた案内(登録・課金・追加課金)を出し分けるため。
+      { limitType: "free_tier" satisfies LimitType },
     );
   }
   return { charge: true };

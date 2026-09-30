@@ -59,14 +59,26 @@ class CandidateRepositoryImpl implements CandidateRepository {
           },
       });
     } on FirebaseFunctionsException catch (e) {
-      // バックエンドのエラーメッセージ(利用上限案内など)をそのまま表示する。
-      throw CandidateFetchException(e.message ?? '候補の取得に失敗しました');
+      final message = e.message ?? '候補の取得に失敗しました';
+      // 利用上限は、種類つきの専用の例外にして、画面が案内を分けられるようにする。
+      if (e.code == 'resource-exhausted') {
+        throw CandidateLimitException(message, kind: _limitKindOf(e.details));
+      }
+      // バックエンドのエラーメッセージをそのまま表示する。
+      throw CandidateFetchException(message);
     }
 
     final rawCandidates = data['candidates'] as List<dynamic>? ?? [];
     return rawCandidates
         .map((json) => _toCandidate(json as Map<String, dynamic>, category))
         .toList();
+  }
+
+  /// エラーの`details`から上限の種類を読む。種類が取れない(古いバックエンド
+  /// など)場合は、無料枠の上限として扱う。
+  static LimitKind _limitKindOf(Object? details) {
+    final type = details is Map ? details['limitType'] : null;
+    return type == 'monthly' ? LimitKind.monthly : LimitKind.freeTier;
   }
 
   Candidate _toCandidate(
