@@ -17,15 +17,18 @@ import 'package:burari_date/presentation/providers/settings_providers.dart';
 /// 渡された好み設定を記録するだけのリポジトリ。
 class _RecordingCandidateRepository implements CandidateRepository {
   AiPreference? receivedPreference;
+  final receivedGachaIds = <String>[];
   int callCount = 0;
 
   @override
   Future<List<Candidate>> getCandidates(
     Station arrival,
     CandidateCategory category, {
+    required String gachaId,
     AiPreference? preference,
   }) async {
     callCount++;
+    receivedGachaIds.add(gachaId);
     receivedPreference = preference;
     return const [];
   }
@@ -39,6 +42,7 @@ class _FailingOnceCandidateRepository implements CandidateRepository {
   Future<List<Candidate>> getCandidates(
     Station arrival,
     CandidateCategory category, {
+    required String gachaId,
     AiPreference? preference,
   }) async {
     callCount++;
@@ -140,6 +144,43 @@ void main() {
     reopened.close();
 
     expect(repository.callCount, 1);
+  });
+
+  test('同じガチャ結果のグルメ・観光は同じgachaId、別のガチャは別のgachaIdを渡す', () async {
+    final repository = _RecordingCandidateRepository();
+    final container = ProviderContainer(
+      overrides: [candidateRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(candidatesProvider(args).future);
+    await container.read(
+      candidatesProvider((
+        result: result,
+        category: CandidateCategory.sightseeing,
+      )).future,
+    );
+    final sameGachaIds = List.of(repository.receivedGachaIds);
+
+    final nextGacha = GachaResult(
+      departureStation: arrival,
+      line: result.line,
+      minStops: 1,
+      maxStops: 1,
+      direction: GachaDirection.random,
+      arrivalStation: arrival,
+      stopsCount: 1,
+      executedAt: DateTime(2026, 9, 30, 0, 0, 1),
+    );
+    await container.read(
+      candidatesProvider((
+        result: nextGacha,
+        category: CandidateCategory.gourmet,
+      )).future,
+    );
+
+    expect(sameGachaIds[0], sameGachaIds[1]);
+    expect(repository.receivedGachaIds[2], isNot(sameGachaIds[0]));
   });
 
   test('カテゴリが違えば別に取得する', () async {

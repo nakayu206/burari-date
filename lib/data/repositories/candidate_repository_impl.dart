@@ -30,6 +30,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
   Future<List<Candidate>> getCandidates(
     Station arrival,
     CandidateCategory category, {
+    required String gachaId,
     AiPreference? preference,
   }) async {
     final latitude = arrival.latitude;
@@ -47,6 +48,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
         'category': category == CandidateCategory.gourmet
             ? 'gourmet'
             : 'sightseeing',
+        // 同じガチャのグルメ・観光を、無料枠で1回と数えるためのID。
+        'gachaId': gachaId,
         // 未設定のときはキー自体を送らず、バックエンドは従来どおりの提案にする。
         if (preference != null)
           'preference': {
