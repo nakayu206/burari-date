@@ -30,6 +30,7 @@ final candidatesProvider = FutureProvider.autoDispose
         return await repository.getCandidates(
           args.result.arrivalStation,
           args.category,
+          gachaId: gachaIdOf(args.result),
           preference: preference,
         );
       } catch (_) {
@@ -37,6 +38,11 @@ final candidatesProvider = FutureProvider.autoDispose
         rethrow;
       }
     });
+
+/// 1回のガチャを識別するID。実行時刻(マイクロ秒)なので、同じガチャ結果の
+/// グルメ・観光は同じID、もう一度ガチャを回すと別のIDになる。
+String gachaIdOf(GachaResult result) =>
+    result.executedAt.microsecondsSinceEpoch.toString();
 
 /// ユーザーが保存した好み設定を読む。読み込みに失敗しても候補の取得自体は
 /// 止めず、好みなし(従来どおりの提案)で続行する。

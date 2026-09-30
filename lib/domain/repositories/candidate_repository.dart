@@ -23,11 +23,15 @@ class CandidateFetchException implements Exception {
 /// 要約・キャッチコピー生成させる(仕様書 5.2 処理フロー / 5.4 ハルシネー
 /// ション対策)。
 abstract interface class CandidateRepository {
+  /// [gachaId]は1回のガチャを識別するID。同じガチャのグルメ・観光の取得を、
+  /// 無料枠で1回と数えるためにバックエンドへ渡す。
+  ///
   /// [preference]はユーザーが保存した好み設定(仕様書5.4)。指定があれば、
   /// AIが好みに合う候補を優先して選ぶ。nullなら従来どおりの提案になる。
   Future<List<Candidate>> getCandidates(
     Station arrival,
     CandidateCategory category, {
+    required String gachaId,
     AiPreference? preference,
   });
 }

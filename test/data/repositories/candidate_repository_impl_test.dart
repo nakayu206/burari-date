@@ -40,6 +40,7 @@ void main() {
       final result = await repository.getCandidates(
         arrival,
         CandidateCategory.gourmet,
+        gachaId: 'g1',
       );
 
       expect(result, hasLength(1));
@@ -60,12 +61,34 @@ void main() {
         },
       );
 
-      await repository.getCandidates(arrival, CandidateCategory.sightseeing);
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.sightseeing,
+        gachaId: 'g1',
+      );
 
       expect(capturedData?['latitude'], 35.69);
       expect(capturedData?['longitude'], 139.70);
       expect(capturedData?['stationName'], '新宿駅');
       expect(capturedData?['category'], 'sightseeing');
+    });
+
+    test('ガチャを識別するgachaIdをリクエストに含める(無料枠を1ガチャ=1回と数えるため)', () async {
+      Map<String, dynamic>? capturedData;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          capturedData = data;
+          return {'candidates': <dynamic>[]};
+        },
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'gacha-123',
+      );
+
+      expect(capturedData?['gachaId'], 'gacha-123');
     });
 
     test('好み設定を渡すと、ジャンル・予算・雰囲気をリクエストに含める', () async {
@@ -80,6 +103,7 @@ void main() {
       await repository.getCandidates(
         arrival,
         CandidateCategory.gourmet,
+        gachaId: 'g1',
         preference: const AiPreference(
           genres: {'和食', 'カフェ'},
           budget: '高め',
@@ -102,7 +126,11 @@ void main() {
         },
       );
 
-      await repository.getCandidates(arrival, CandidateCategory.gourmet);
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
 
       expect(capturedData, isNotNull);
       expect(capturedData!.containsKey('preference'), isFalse);
@@ -124,7 +152,11 @@ void main() {
       );
 
       await expectLater(
-        repository.getCandidates(noLocationStation, CandidateCategory.gourmet),
+        repository.getCandidates(
+          noLocationStation,
+          CandidateCategory.gourmet,
+          gachaId: 'g1',
+        ),
         throwsException,
       );
       expect(called, isFalse);
@@ -141,7 +173,11 @@ void main() {
       );
 
       await expectLater(
-        repository.getCandidates(arrival, CandidateCategory.gourmet),
+        repository.getCandidates(
+          arrival,
+          CandidateCategory.gourmet,
+          gachaId: 'g1',
+        ),
         throwsA(
           isA<CandidateFetchException>()
               .having((e) => e.message, 'message', '今月の利用上限に達しました。来月またご利用ください')
