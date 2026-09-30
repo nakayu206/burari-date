@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildPreferenceNote, buildPrompt } from "./ai";
-import { parsePreference } from "./preference";
+import { parsePreference, prioritizeByGenres } from "./preference";
 import type { RawPlace } from "./types";
 
 const places: RawPlace[] = [{ id: "a", name: "テスト食堂" }];
@@ -87,4 +87,50 @@ test("好みは優先のヒントで、事実の創作をしない指示が残�
   assert.ok(prompt.includes("他の場所も選んで構いません"));
   assert.ok(prompt.includes("データにない事実は断定して書かない"));
   assert.ok(prompt.includes("店名・住所などの事実情報は絶対に創作せず"));
+});
+
+const shop = (id: string, categoryName?: string): RawPlace => ({
+  id,
+  name: id,
+  categoryName,
+});
+
+test("好みのジャンルの店を先頭に並べ、元の順序は保つ", () => {
+  const places = [
+    shop("a", "イタリアン・フレンチ"),
+    shop("b", "中華"),
+    shop("c", "居酒屋"),
+    shop("d", "中華"),
+  ];
+  const sorted = prioritizeByGenres(places, ["中華"]);
+  assert.deepEqual(
+    sorted.map((p) => p.id),
+    ["b", "d", "a", "c"],
+  );
+});
+
+test("好みに合わない店も後ろに残す(絞り込まない)", () => {
+  const places = [shop("a", "居酒屋"), shop("b", "ラーメン")];
+  const sorted = prioritizeByGenres(places, ["中華"]);
+  assert.deepEqual(
+    sorted.map((p) => p.id),
+    ["a", "b"],
+  );
+});
+
+test("カフェ・スイーツのジャンル名は、好みの「カフェ」「スイーツ」のどちらにも一致する", () => {
+  const places = [shop("a", "居酒屋"), shop("b", "カフェ・スイーツ")];
+  assert.equal(prioritizeByGenres(places, ["カフェ"])[0].id, "b");
+  assert.equal(prioritizeByGenres(places, ["スイーツ"])[0].id, "b");
+});
+
+test("好みのジャンルがない・ジャンル名が取れない場合は順序を変えない", () => {
+  const places = [shop("a", "居酒屋"), shop("b"), shop("c", "中華")];
+  assert.deepEqual(prioritizeByGenres(places, []).map((p) => p.id), ["a", "b", "c"]);
+  assert.deepEqual(prioritizeByGenres(places, ["洋食"]).map((p) => p.id), ["a", "b", "c"]);
+});
+
+test("プロンプトで、好みに合う場所を結果の上位に並べるよう指示する", () => {
+  const prompt = buildPrompt("新宿駅", "gourmet", places, { genres: ["中華"] });
+  assert.ok(prompt.includes("結果の上位(先頭)に並べてください"));
 });
