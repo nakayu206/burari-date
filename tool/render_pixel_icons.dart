@@ -8,7 +8,7 @@ import 'package:image/image.dart' as img;
 void main(List<String> args) {
   final scale = args.length > 1 ? int.parse(args[1]) : 8;
   final kinds = PixelIconKind.values;
-  const columns = 8;
+  const columns = 9;
   final rows = (kinds.length / columns).ceil();
   const gap = 2; // マス単位の余白
   final cell = (pixelIconGrid + gap) * scale;

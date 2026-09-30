@@ -46,9 +46,20 @@ void main() {
       expect(gourmet('カフェ・スイーツ'), PixelIconKind.coffee);
       expect(gourmet('スイーツ'), PixelIconKind.cake);
       expect(gourmet('居酒屋'), PixelIconKind.beer);
-      expect(gourmet('バー・カクテル'), PixelIconKind.beer);
       expect(gourmet('ダイニングバー・バル'), PixelIconKind.beer);
       expect(gourmet('焼肉・ホルモン'), PixelIconKind.meat);
+    });
+
+    test('追加したジャンルのアイコンを選ぶ', () {
+      expect(gourmet('アジア・エスニック料理'), PixelIconKind.curry);
+      expect(gourmet('カレー'), PixelIconKind.curry);
+      expect(gourmet('カラオケ・パーティ'), PixelIconKind.mic);
+    });
+
+    test('「バー・カクテル」は「バー」を含むが、ジョッキではなくカクテルにする', () {
+      expect(gourmet('バー・カクテル'), PixelIconKind.cocktail);
+      // 「バー」だけのジャンルは、これまでどおりジョッキ。
+      expect(gourmet('ダイニングバー・バル'), PixelIconKind.beer);
     });
 
     test('対応表にないジャンル・ジャンル名なしは、ナイフとフォークにする', () {
@@ -86,6 +97,27 @@ void main() {
       expect(sightseeing('神社'), PixelIconKind.torii);
       expect(sightseeing('温泉'), PixelIconKind.onsen);
       expect(sightseeing('遊園地'), PixelIconKind.ferrisWheel);
+    });
+
+    test('追加した観光カテゴリのアイコンを、英語・日本語の両方で選ぶ', () {
+      expect(sightseeing('Movie Theater'), PixelIconKind.movie);
+      expect(sightseeing('映画館'), PixelIconKind.movie);
+      expect(sightseeing('Music Venue'), PixelIconKind.music);
+      expect(sightseeing('ライブハウス'), PixelIconKind.music);
+      expect(sightseeing('Zoo'), PixelIconKind.paw);
+      expect(sightseeing('動物園'), PixelIconKind.paw);
+      expect(sightseeing('Mountain'), PixelIconKind.mountain);
+      expect(sightseeing('Hiking Trail'), PixelIconKind.mountain);
+      expect(sightseeing('Castle'), PixelIconKind.castle);
+      expect(sightseeing('Historic Site'), PixelIconKind.castle);
+      expect(sightseeing('史跡'), PixelIconKind.castle);
+      expect(sightseeing('Beach'), PixelIconKind.beach);
+      expect(sightseeing('ビーチ'), PixelIconKind.beach);
+      expect(sightseeing('Stadium'), PixelIconKind.ball);
+      expect(sightseeing('Bowling Alley'), PixelIconKind.ball);
+      expect(sightseeing('ボウリング場'), PixelIconKind.ball);
+      expect(sightseeing('Karaoke Bar'), PixelIconKind.mic);
+      expect(sightseeing('カラオケ'), PixelIconKind.mic);
     });
 
     test('「Amusement Park」は、「Park」より先に遊園地と判定する', () {
