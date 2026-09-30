@@ -22,5 +22,7 @@ void main() {
     dstX: (canvas - inner) ~/ 2,
     dstY: (canvas - inner) ~/ 2,
   );
-  File('assets/images/splash_android12.png').writeAsBytesSync(img.encodePng(out));
+  File(
+    'assets/images/splash_android12.png',
+  ).writeAsBytesSync(img.encodePng(out));
 }
