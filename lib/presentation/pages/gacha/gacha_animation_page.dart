@@ -44,12 +44,22 @@ const _kFlapCellBackground = Color(0xFF1B1B1B);
 const _kFlapCellText = Color(0xFFF2C98A);
 const _kCaptionColor = Color(0xFFD99A2B);
 const _kPlaceholderChar = '−';
-// キャプション文字は空の背景(時間帯で色が変わる)に直接乗るため、暗めのハロー
-// (縁取り)を敷いて夕方など明るい背景でも視認性を確保する(ユーザー
-// フィードバック:「結果の何駅隣とかに文字の色が夕方とかだと見づらい」)。
+// キャプション文字は空の背景(時間帯で色が変わる)に直接乗るため、暗い縁取りを
+// 付けて、夕方・昼など明るい背景でも視認性を確保する(ユーザーフィードバック:
+// 「結果の何駅隣とかに文字の色が夕方とかだと見づらい」「昼間は影が入っていると
+// 見づらい」)。ぼかし付きの影は、明るい空では暗いぼやけが文字の周りに広がって
+// かえって読みにくいため、ぼかしのない8方向のずらしで、くっきりした縁取りにする
+// (背景のドット絵調にもそろう)。
+const _kCaptionOutlineColor = Color(0xFF2E2115);
 const _kCaptionShadows = [
-  Shadow(color: Color(0xCC2E2115), blurRadius: 3),
-  Shadow(color: Color(0x992E2115), blurRadius: 8),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(-1.5, 0)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(1.5, 0)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(0, -1.5)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(0, 1.5)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(-1.5, -1.5)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(1.5, -1.5)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(-1.5, 1.5)),
+  Shadow(color: _kCaptionOutlineColor, offset: Offset(1.5, 1.5)),
 ];
 
 /// S-03 ガチャ演出画面。晴天の空・電車が線路を走る背景の上に、発車標(スプリットフラップ)風のセルが1文字ずつ段差をつけてパタッと確定する。確定後は別画面へ自動遷移せず、この場で電車の正面イラストと「この駅に行く」「もう一度ガチャ」を表示する。
