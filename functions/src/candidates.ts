@@ -4,7 +4,7 @@ import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
 import { releaseUsage, reserveUsage } from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
-import { parsePreference } from "./preference";
+import { parsePreference, prioritizeByGenres } from "./preference";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
 import type { Candidate, CandidateCategory } from "./types";
 
@@ -48,16 +48,22 @@ export const getCandidates = onCall<GetCandidatesRequest>(
     await reserveUsage(request.auth.uid);
 
     try {
+      const preference = parsePreference(request.data.preference);
+      // グルメは、好みのジャンルの店を先頭に並べてからAIに渡す(AIが受け取る
+      // のは先頭の20件のため、近い順のままだと好みの店が漏れる)。
       const rawPlaces =
         category === "gourmet"
-          ? await searchGourmet(latitude, longitude)
+          ? prioritizeByGenres(
+              await searchGourmet(latitude, longitude),
+              preference?.genres ?? [],
+            )
           : await searchSightseeing(latitude, longitude);
 
       const picks = await generateCandidates(
         stationName,
         category,
         rawPlaces,
-        parsePreference(request.data.preference),
+        preference,
       );
 
       const candidates: Candidate[] = picks.map((pick) => ({
