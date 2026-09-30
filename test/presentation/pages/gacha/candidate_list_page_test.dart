@@ -92,5 +92,76 @@ void main() {
 
       expect(find.text('情報提供: ホットペッパーグルメ'), findsNothing);
     });
+
+    testWidgets('タブを切り替えても、一度取得した候補は取り直さない', (tester) async {
+      final fetchCounts = <CandidateCategory, int>{};
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith((ref, args) async {
+              fetchCounts[args.category] =
+                  (fetchCounts[args.category] ?? 0) + 1;
+              return args.category == CandidateCategory.gourmet
+                  ? [gourmetCandidate]
+                  : [sightseeingCandidate];
+            }),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('観光'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('グルメ'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('観光'));
+      await tester.pumpAndSettle();
+
+      expect(fetchCounts[CandidateCategory.gourmet], 1);
+      expect(fetchCounts[CandidateCategory.sightseeing], 1);
+    });
+
+    testWidgets('キャッチコピーに「AI:」の接頭辞を付けない', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => [gourmetCandidate],
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('キャッチコピー'), findsOneWidget);
+      expect(find.textContaining('AI:'), findsNothing);
+    });
+
+    testWidgets('取得に失敗したら「再読み込み」で取り直せる', (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith((ref, args) async {
+              calls++;
+              if (calls == 1) throw Exception('network');
+              return [gourmetCandidate];
+            }),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('候補の取得に失敗しました'), findsOneWidget);
+
+      await tester.tap(find.text('再読み込み'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('テスト洋食屋'), findsOneWidget);
+      expect(find.textContaining('候補の取得に失敗しました'), findsNothing);
+    });
   });
 }
