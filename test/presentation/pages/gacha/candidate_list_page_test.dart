@@ -10,6 +10,7 @@ import 'package:burari_date/domain/repositories/candidate_repository.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_list_page.dart';
 import 'package:burari_date/presentation/widgets/pixel_icon.dart';
 import 'package:burari_date/presentation/widgets/pixel_icon_data.dart';
+import 'package:burari_date/presentation/providers/auth_providers.dart';
 import 'package:burari_date/presentation/providers/candidate_providers.dart';
 
 void main() {
@@ -205,6 +206,45 @@ void main() {
       );
       expect(find.textContaining('Exception'), findsNothing);
       expect(find.textContaining('候補の取得に失敗しました'), findsNothing);
+    });
+
+    testWidgets('上限に達したときは「再読み込み」を出さず、案内のボタンを出す', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hasAccountProvider.overrideWithValue(false),
+            candidatesProvider.overrideWith(
+              (ref, args) async => throw const CandidateLimitException(
+                '無料利用の上限(10回)に達しました。継続利用にはアカウント登録と課金が必要です。',
+              ),
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('アカウント登録と課金'), findsOneWidget);
+      expect(find.text('再読み込み'), findsNothing);
+    });
+
+    testWidgets('アカウントがあるときは、課金のボタンを出す', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hasAccountProvider.overrideWithValue(true),
+            candidatesProvider.overrideWith(
+              (ref, args) async =>
+                  throw const CandidateLimitException('上限に達しました'),
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('課金する'), findsOneWidget);
+      expect(find.text('再読み込み'), findsNothing);
     });
 
     testWidgets('想定外のエラーは、内部の表記を出さずに汎用の文言を表示する', (tester) async {
