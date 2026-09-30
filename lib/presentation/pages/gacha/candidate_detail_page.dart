@@ -109,16 +109,23 @@ class CandidateDetailPage extends ConsumerWidget {
               _CandidateMap(location: location, label: candidate.name)
             else
               const _MapUnavailable(),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              '住所: ${candidate.address ?? '(外部API連携後に表示)'}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: AppFontSizes.labelSmall,
+            // 住所を取得できない候補では、行ごと表示しない。
+            if (candidate.address != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                '住所: ${candidate.address}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.labelSmall,
+                ),
               ),
-            ),
+            ],
             if (candidate.category == CandidateCategory.gourmet) ...[
-              const SizedBox(height: AppSpacing.xs),
+              SizedBox(
+                height: candidate.address != null
+                    ? AppSpacing.xs
+                    : AppSpacing.lg,
+              ),
               const _HotPepperCredit(),
             ],
             const SizedBox(height: AppSpacing.lg),
