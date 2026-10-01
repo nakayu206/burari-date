@@ -2,26 +2,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/settings_repository_impl.dart';
 import '../../domain/entities/ai_preference.dart';
-import '../../domain/entities/notification_settings.dart';
+import '../../domain/entities/sound_settings.dart';
 import '../../domain/repositories/settings_repository.dart';
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return SettingsRepositoryImpl();
 });
 
-/// 通知設定。変更は即座に画面へ反映し、保存に失敗した場合は元の値に戻して
+/// 効果音の設定。変更は即座に画面へ反映し、保存に失敗した場合は元の値に戻して
 /// 例外を呼び出し元へ伝える(画面側でダイアログを出す)。
-class NotificationSettingsNotifier extends AsyncNotifier<NotificationSettings> {
+class SoundSettingsNotifier extends AsyncNotifier<SoundSettings> {
   @override
-  Future<NotificationSettings> build() {
-    return ref.read(settingsRepositoryProvider).loadNotificationSettings();
+  Future<SoundSettings> build() {
+    return ref.read(settingsRepositoryProvider).loadSoundSettings();
   }
 
-  Future<void> save(NotificationSettings next) async {
+  Future<void> save(SoundSettings next) async {
     final previous = state;
     state = AsyncData(next);
     try {
-      await ref.read(settingsRepositoryProvider).saveNotificationSettings(next);
+      await ref.read(settingsRepositoryProvider).saveSoundSettings(next);
     } catch (_) {
       state = previous;
       rethrow;
@@ -29,12 +29,12 @@ class NotificationSettingsNotifier extends AsyncNotifier<NotificationSettings> {
   }
 }
 
-final notificationSettingsProvider =
-    AsyncNotifierProvider<NotificationSettingsNotifier, NotificationSettings>(
-      NotificationSettingsNotifier.new,
+final soundSettingsProvider =
+    AsyncNotifierProvider<SoundSettingsNotifier, SoundSettings>(
+      SoundSettingsNotifier.new,
     );
 
-/// AI提案の好み設定。保存失敗時の扱いは[NotificationSettingsNotifier]と同じ。
+/// AI提案の好み設定。保存失敗時の扱いは[SoundSettingsNotifier]と同じ。
 class AiPreferenceNotifier extends AsyncNotifier<AiPreference> {
   @override
   Future<AiPreference> build() {

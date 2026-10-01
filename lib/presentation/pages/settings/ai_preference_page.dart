@@ -36,7 +36,7 @@ class AiPreferencePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preference = ref.watch(aiPreferenceProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('AI提案の好み設定')),
+      appBar: AppBar(title: const Text('好み設定')),
       body: SafeArea(
         child: preference.when(
           loading: () => const Center(child: CircularProgressIndicator()),

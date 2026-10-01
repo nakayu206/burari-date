@@ -6,7 +6,7 @@ import 'package:burari_date/data/repositories/settings_repository_impl.dart';
 import 'package:burari_date/domain/entities/ai_preference.dart';
 import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/gacha_result.dart';
-import 'package:burari_date/domain/entities/notification_settings.dart';
+import 'package:burari_date/domain/entities/sound_settings.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/domain/repositories/candidate_repository.dart';
@@ -61,14 +61,13 @@ class _FailingLoadSettingsRepository implements SettingsRepository {
   Future<AiPreference> loadAiPreference() async => const AiPreference();
 
   @override
-  Future<NotificationSettings> loadNotificationSettings() async =>
-      const NotificationSettings();
+  Future<SoundSettings> loadSoundSettings() async => const SoundSettings();
 
   @override
   Future<void> saveAiPreference(AiPreference preference) async {}
 
   @override
-  Future<void> saveNotificationSettings(NotificationSettings settings) async {}
+  Future<void> saveSoundSettings(SoundSettings settings) async {}
 }
 
 void main() {

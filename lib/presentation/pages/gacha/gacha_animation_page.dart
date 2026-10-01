@@ -10,7 +10,11 @@ import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_train_colors.dart';
 import '../../../domain/entities/gacha_result.dart';
+import '../../../domain/entities/sound_settings.dart';
+import '../../../domain/services/sound_player.dart';
 import '../../providers/gacha_form_provider.dart';
+import '../../providers/settings_providers.dart';
+import '../../providers/sound_providers.dart';
 import '../../widgets/train_illustration.dart';
 import 'candidate_list_page.dart';
 
@@ -89,11 +93,26 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   /// [_runSequence]が予約する各段階のタイマー。スキップ/再ガチャ時に確実にキャンセルできるよう保持しておく。
   Timer? _sequenceTimer;
 
+  /// 効果音のプレイヤー。dispose中は[ref]を使えないため、最初に取っておく。
+  late final SoundPlayer _soundPlayer;
+
   @override
   void initState() {
     super.initState();
     _result = widget.result;
     _setUpTexts();
+    _soundPlayer = ref.read(soundPlayerProvider);
+    // 効果音の設定を、演出の開始前に読み込んでおく(最初の音から設定に従うため)。
+    ref.read(soundSettingsProvider);
+  }
+
+  /// 効果音を鳴らす。設定がオフのときは鳴らさない。設定を読み込み中の間は、
+  /// 初期値(オン)として扱う。
+  void _play(GachaSound sound) {
+    final settings =
+        ref.read(soundSettingsProvider).value ?? const SoundSettings();
+    if (!settings.isSoundEnabled) return;
+    unawaited(_soundPlayer.play(sound, volume: settings.volume));
   }
 
   /// 「ガチャる」ボタン押下でフリップ演出を開始する。
@@ -103,12 +122,15 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
       _started = true;
       _caption1 = '駅隣を決定中…';
     });
+    _play(GachaSound.flip);
     _runSequence();
   }
 
   @override
   void dispose() {
     _sequenceTimer?.cancel();
+    // 画面を閉じたあとに、音だけが鳴り続けないようにする。
+    unawaited(_soundPlayer.stopAll());
     super.dispose();
   }
 
@@ -127,6 +149,7 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
       setState(() {
         _caption1 = '${_result.stopsCount}駅隣に決定!';
       });
+      _play(GachaSound.confirm);
 
       _sequenceTimer = Timer(_kInterRowPause, () {
         if (!mounted) return;
@@ -134,12 +157,14 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
           _caption2 = '到着駅を表示中…';
           _row2Active = true;
         });
+        _play(GachaSound.flip);
 
         _sequenceTimer = Timer(_rowDuration, () {
           if (!mounted) return;
           setState(() {
             _caption2 = '到着駅：${_result.arrivalStation.name}';
           });
+          _play(GachaSound.decide);
 
           _sequenceTimer = Timer(_kFinishPause, () {
             if (!mounted) return;
@@ -154,12 +179,15 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   void _skip() {
     if (!_started || _finished) return;
     _sequenceTimer?.cancel();
+    // 途中まで鳴っていたフリップ音を止め、決定音だけを鳴らす。
+    unawaited(_soundPlayer.stopAll());
     setState(() {
       _caption1 = '${_result.stopsCount}駅隣に決定!';
       _caption2 = '到着駅：${_result.arrivalStation.name}';
       _row2Active = true;
       _finished = true;
     });
+    _play(GachaSound.decide);
   }
 
   /// もう一度ガチャ。画面遷移はせず、この場で新しい結果の演出を再生する。
@@ -173,6 +201,7 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
       _row2Active = false;
       _finished = false;
     });
+    _play(GachaSound.flip);
     _runSequence();
   }
 
