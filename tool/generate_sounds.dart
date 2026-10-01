@@ -57,25 +57,29 @@ List<double> _clack(
   double volume = 1.0,
   double heavy = 0.0,
 }) {
+  // 低中域の板の響きを残して、乾いた「パタッ」にする。
   final body = _bandpass(
-    _decayingNoise(random, 40, 0.16 - heavy * 0.05),
-    (650 + heavy * 200) * pitch,
-    3.0,
+    _decayingNoise(random, 65, 0.075 - heavy * 0.02),
+    720 * pitch,
+    1.1,
   );
-  final tap = _bandpass(_decayingNoise(random, 25, 0.28), 2600 * pitch, 1.4);
+  final tap = _bandpass(_decayingNoise(random, 35, 0.16), 2100 * pitch, 0.9);
   final n = max(body.length, tap.length);
   final out = List<double>.filled(n, 0);
   for (var i = 0; i < n; i++) {
     out[i] =
-        (i < body.length ? body[i] * 2.4 : 0) +
-        (i < tap.length ? tap[i] * 1.2 : 0);
+        (i < body.length ? body[i] * 2.3 : 0) +
+        (i < tap.length ? tap[i] * 0.55 : 0);
+    final t = i / _sampleRate;
+    out[i] += sin(2 * pi * 390 * pitch * t) * exp(-t * 95) * 0.32;
+    out[i] *= min(1.0, t / 0.0008);
   }
   // 重い「パタン」には、低い「ドン」を足す。
   if (heavy > 0) {
-    final thumpLen = _sampleRate * 70 ~/ 1000;
+    final thumpLen = _sampleRate * 40 ~/ 1000;
     for (var i = 0; i < thumpLen && i < n; i++) {
       final t = i / _sampleRate;
-      out[i] += sin(2 * pi * 150 * t) * exp(-t * 70) * heavy * 0.9;
+      out[i] += sin(2 * pi * 220 * t) * exp(-t * 110) * heavy * 0.35;
     }
   }
   return _scale(out, volume);
@@ -94,48 +98,51 @@ List<double> _mix(int totalMs, List<(double, List<double>)> parts) {
   return out;
 }
 
-/// 汽笛の1音。重なった和音(根音・長3度・5度)に、倍音と、息の雑音、小さなゆらぎを
+/// 汽笛の1音。ほぼ同じ高さの管のうなりに、倍音と、息の雑音、小さなゆらぎを
 /// 足す。立ち上がりは速く、終わりは、ゆっくり消える。
 List<double> _whistle(
   Random random,
   double rootHz,
   int ms, {
   double vibratoHz = 0,
-  double drop = 0,
+  double scoop = 0,
+  double rise = 0,
 }) {
   final n = _sampleRate * ms ~/ 1000;
   final out = List<double>.filled(n, 0);
-  const chord = [1.0, 1.26, 1.5];
-  const harmonics = 6;
+  const chord = [0.995, 1.0, 1.006];
+  const harmonics = 4;
   final phases = List<double>.filled(chord.length * harmonics, 0);
   for (var i = 0; i < n; i++) {
     final t = i / _sampleRate;
     final progress = i / n;
-    // 後半の入りから、音程が少し下がり、ゆらぐ(息が弱まる)。
+    // 出だしは[scoop]だけ低いところから、すっと上がる。そのあとも[rise]だけ、
+    // ゆっくり上がり続ける(下げない)。後半は、小さくゆらぐ。
     final pitch =
         1.0 -
-        drop * progress * progress +
-        (vibratoHz > 0 ? 0.006 * sin(2 * pi * vibratoHz * t) * progress : 0);
+        scoop * exp(-t / 0.07) +
+        rise * progress +
+        (vibratoHz > 0 ? 0.004 * sin(2 * pi * vibratoHz * t) * progress : 0);
     var sample = 0.0;
     var p = 0;
     for (final ratio in chord) {
       for (var h = 1; h <= harmonics; h++) {
         phases[p] += 2 * pi * rootHz * ratio * h * pitch / _sampleRate;
-        // 高い倍音ほど小さく。奇数倍音を少し強くして、笛らしい響きにする。
-        final weight = (h.isOdd ? 1.0 : 0.55) / h;
+        // 基音中心の丸い汽笛。強い高次倍音による電子音っぽさを抑える。
+        final weight = [1.0, 0.24, 0.11, 0.035][h - 1];
         sample += sin(phases[p]) * weight;
         p++;
       }
     }
     final attack = min(1.0, t / 0.018);
-    final release = min(1.0, (n - i) / (_sampleRate * 0.16));
+    final release = min(1.0, (n - 1 - i) / (_sampleRate * 0.10));
     out[i] = sample * attack * release / (chord.length * 1.6);
   }
   // 息の雑音(笛の鳴る帯域だけ)。
   final breath = _bandpass(
     List<double>.generate(n, (_) => random.nextDouble() * 2 - 1),
-    2400,
-    1.0,
+    1300,
+    0.7,
   );
   for (var i = 0; i < n; i++) {
     final env =
@@ -150,8 +157,8 @@ List<double> _whistle(
 List<double> _echo(
   List<double> x, {
   int delayMs = 110,
-  double feedback = 0.3,
-  double mix = 0.4,
+  double feedback = 0.22,
+  double mix = 0.3,
 }) {
   final delay = _sampleRate * delayMs ~/ 1000;
   final y = List<double>.from(x);
@@ -209,33 +216,37 @@ void _write(String name, List<double> samples) {
 void main() {
   final random = Random(20261001);
 
-  // フリップ音: 発車標のパタパタ。空回り5回(110msごと)は、板が次々にめくれる
-  // 「パララララ」。最後(550msから)は、板が落ち着く「パタ、パタン」。
+  // 110msごとの動きに、板が離れる音と当たる音を対応させる。
+  // 連打を詰めすぎず「パタ・パタ」と聞き取れる間隔にする。
   // gacha_animation_page.dartの_kFlapCardTotalMs(810ms)に合わせる。
   final flipParts = <(double, List<double>)>[];
+  const flipPitch = 1.2; // 板の響きを残しつつ、パタパタ音を少し高めにする。
   for (var k = 0; k < 5; k++) {
     final base = k * 110.0;
-    const clacks = 6;
+    const clacks = 2;
     for (var c = 0; c < clacks; c++) {
-      // めくれる間隔と強さに、ばらつきをつける。後ろほど弱くなる。
-      final at = base + c * 15 + (random.nextDouble() - 0.5) * 6;
-      final volume = (1.0 - c * 0.12) * (0.85 + random.nextDouble() * 0.3);
-      final pitch = 0.9 + random.nextDouble() * 0.25;
+      // 強さと音の高さに少しばらつきをつける。
+      final at = base + c * 43;
+      final volume = (c == 0 ? 0.72 : 1.0) * (0.9 + random.nextDouble() * 0.2);
+      final pitch = (0.88 + random.nextDouble() * 0.16) * flipPitch;
       flipParts.add((at, _clack(random, pitch: pitch, volume: volume * 0.8)));
     }
   }
-  flipParts.add((550, _clack(random, pitch: 1.0, volume: 0.9, heavy: 0.3)));
-  flipParts.add((600, _clack(random, pitch: 0.92, volume: 0.95, heavy: 0.5)));
-  flipParts.add((668, _clack(random, pitch: 0.8, volume: 1.2, heavy: 1.0)));
-  _write('flip', _normalize(_mix(810, flipParts), 0.62));
+  flipParts.add((550, _clack(random, pitch: 1.1 * flipPitch, volume: 0.75)));
+  flipParts.add((665, _clack(random, pitch: 0.95 * flipPitch, volume: 0.85)));
+  flipParts.add((
+    740,
+    _clack(random, pitch: 0.82 * flipPitch, volume: 1.0, heavy: 0.3),
+  ));
+  _write('flip', _normalize(_mix(810, flipParts), 0.72));
 
   // 確定音: 上段が決まったときの、重めの「パタン」(板が最後に落ちる音)。
   _write(
     'confirm',
     _normalize(
       _mix(320, [
-        (0, _clack(random, pitch: 0.95, volume: 0.8, heavy: 0.4)),
-        (34, _clack(random, pitch: 0.78, volume: 1.2, heavy: 1.0)),
+        (0, _clack(random, pitch: 1.1, volume: 0.7)),
+        (28, _clack(random, pitch: 0.92, volume: 1.0, heavy: 0.25)),
       ]),
       0.6,
     ),
@@ -248,8 +259,9 @@ void main() {
     _normalize(
       _echo(
         _mix(1900, [
-          (0, _whistle(random, 392, 190)),
-          (260, _whistle(random, 392, 1250, vibratoHz: 5, drop: 0.035)),
+          // 同じ汽笛を短く、長く。2音目を別の音程にしない。
+          (0, _whistle(random, 440, 180, scoop: 0.045)),
+          (290, _whistle(random, 440, 1100, vibratoHz: 3.2, scoop: 0.045)),
         ]),
       ),
       0.55,
