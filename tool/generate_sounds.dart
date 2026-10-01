@@ -57,25 +57,27 @@ List<double> _clack(
   double volume = 1.0,
   double heavy = 0.0,
 }) {
+  // 軽く聞こえるよう、板の鳴りは高め(1500Hz付近)・短く、ぶつかる音も高め
+  // (3300Hz付近)にする。低い成分は、[heavy]のときだけ足す。
   final body = _bandpass(
-    _decayingNoise(random, 40, 0.16 - heavy * 0.05),
-    (650 + heavy * 200) * pitch,
-    3.0,
+    _decayingNoise(random, 22, 0.30 - heavy * 0.05),
+    (1500 + heavy * 150) * pitch,
+    2.6,
   );
-  final tap = _bandpass(_decayingNoise(random, 25, 0.28), 2600 * pitch, 1.4);
+  final tap = _bandpass(_decayingNoise(random, 14, 0.42), 3300 * pitch, 1.5);
   final n = max(body.length, tap.length);
   final out = List<double>.filled(n, 0);
   for (var i = 0; i < n; i++) {
     out[i] =
-        (i < body.length ? body[i] * 2.4 : 0) +
-        (i < tap.length ? tap[i] * 1.2 : 0);
+        (i < body.length ? body[i] * 1.5 : 0) +
+        (i < tap.length ? tap[i] * 1.4 : 0);
   }
   // 重い「パタン」には、低い「ドン」を足す。
   if (heavy > 0) {
-    final thumpLen = _sampleRate * 70 ~/ 1000;
+    final thumpLen = _sampleRate * 40 ~/ 1000;
     for (var i = 0; i < thumpLen && i < n; i++) {
       final t = i / _sampleRate;
-      out[i] += sin(2 * pi * 150 * t) * exp(-t * 70) * heavy * 0.9;
+      out[i] += sin(2 * pi * 220 * t) * exp(-t * 110) * heavy * 0.35;
     }
   }
   return _scale(out, volume);
@@ -101,7 +103,8 @@ List<double> _whistle(
   double rootHz,
   int ms, {
   double vibratoHz = 0,
-  double drop = 0,
+  double scoop = 0,
+  double rise = 0,
 }) {
   final n = _sampleRate * ms ~/ 1000;
   final out = List<double>.filled(n, 0);
@@ -111,11 +114,13 @@ List<double> _whistle(
   for (var i = 0; i < n; i++) {
     final t = i / _sampleRate;
     final progress = i / n;
-    // 後半の入りから、音程が少し下がり、ゆらぐ(息が弱まる)。
+    // 出だしは[scoop]だけ低いところから、すっと上がる。そのあとも[rise]だけ、
+    // ゆっくり上がり続ける(下げない)。後半は、小さくゆらぐ。
     final pitch =
         1.0 -
-        drop * progress * progress +
-        (vibratoHz > 0 ? 0.006 * sin(2 * pi * vibratoHz * t) * progress : 0);
+        scoop * exp(-t / 0.07) +
+        rise * progress +
+        (vibratoHz > 0 ? 0.004 * sin(2 * pi * vibratoHz * t) * progress : 0);
     var sample = 0.0;
     var p = 0;
     for (final ratio in chord) {
@@ -224,9 +229,9 @@ void main() {
       flipParts.add((at, _clack(random, pitch: pitch, volume: volume * 0.8)));
     }
   }
-  flipParts.add((550, _clack(random, pitch: 1.0, volume: 0.9, heavy: 0.3)));
-  flipParts.add((600, _clack(random, pitch: 0.92, volume: 0.95, heavy: 0.5)));
-  flipParts.add((668, _clack(random, pitch: 0.8, volume: 1.2, heavy: 1.0)));
+  flipParts.add((550, _clack(random, pitch: 1.1, volume: 0.75)));
+  flipParts.add((596, _clack(random, pitch: 1.0, volume: 0.85)));
+  flipParts.add((648, _clack(random, pitch: 0.9, volume: 1.0, heavy: 0.2)));
   _write('flip', _normalize(_mix(810, flipParts), 0.62));
 
   // 確定音: 上段が決まったときの、重めの「パタン」(板が最後に落ちる音)。
@@ -234,8 +239,8 @@ void main() {
     'confirm',
     _normalize(
       _mix(320, [
-        (0, _clack(random, pitch: 0.95, volume: 0.8, heavy: 0.4)),
-        (34, _clack(random, pitch: 0.78, volume: 1.2, heavy: 1.0)),
+        (0, _clack(random, pitch: 1.1, volume: 0.7)),
+        (28, _clack(random, pitch: 0.92, volume: 1.0, heavy: 0.25)),
       ]),
       0.6,
     ),
@@ -248,8 +253,12 @@ void main() {
     _normalize(
       _echo(
         _mix(1900, [
-          (0, _whistle(random, 392, 190)),
-          (260, _whistle(random, 392, 1250, vibratoHz: 5, drop: 0.035)),
+          // 「ポッ」(低め)→「ポー」(長3度高く、下から上がる)。
+          (0, _whistle(random, 392, 190, scoop: 0.03)),
+          (
+            260,
+            _whistle(random, 494, 1250, vibratoHz: 5, scoop: 0.07, rise: 0.02),
+          ),
         ]),
       ),
       0.55,
