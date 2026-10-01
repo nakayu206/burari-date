@@ -5,6 +5,7 @@ import {
   addCategory,
   isValidGachaId,
   LIFETIME_FREE_LIMIT,
+  planRelease,
   planReservation,
   removeCategory,
 } from "./fairUse";
@@ -86,6 +87,34 @@ test("取得に失敗して記録から外したカテゴリは、取り直し�
   recorded = removeCategory(recorded, "sightseeing");
   // 観光の取り直しは、数え済みガチャの別カテゴリとして、無料のまま。
   assert.deepEqual(planReservation(1, recorded, "sightseeing"), { charge: false });
+});
+
+test("枠を消費したグルメが失敗しても、観光が成功・取得中なら枠を戻さない", () => {
+  // グルメ(数える)と観光(数えない)を並行して取得し、グルメだけ失敗した。
+  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet");
+  assert.equal(plan.refund, false);
+  assert.deepEqual(plan.remaining, ["sightseeing"]);
+});
+
+test("グルメが先に失敗したあと観光も失敗したら、そのガチャで消費した枠を戻す", () => {
+  // 1つ目の失敗では戻さず、記録に残った観光が失敗して空になったときに戻す。
+  const second = planRelease(false, true, ["sightseeing"], "sightseeing");
+  assert.equal(second.refund, true);
+  assert.deepEqual(second.remaining, []);
+});
+
+test("観光が先に失敗しても、グルメが残っていれば戻さず、グルメの失敗で戻す", () => {
+  assert.equal(planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing").refund, false);
+  assert.equal(planRelease(true, true, ["gourmet"], "gourmet").refund, true);
+});
+
+test("1つだけ取得して失敗したときは、消費した枠を戻す", () => {
+  assert.equal(planRelease(true, true, ["gourmet"], "gourmet").refund, true);
+});
+
+test("gachaIdなし(記録なし)では、今回数えた分だけを戻す", () => {
+  assert.equal(planRelease(true, undefined, undefined, "gourmet").refund, true);
+  assert.equal(planRelease(false, undefined, undefined, "gourmet").refund, false);
 });
 
 test("gachaIdの形式を検証する(英数字・_・-のみ、64文字まで)", () => {

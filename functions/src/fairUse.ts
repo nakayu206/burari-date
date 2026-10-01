@@ -80,6 +80,28 @@ export function removeCategory(recorded: string[] | undefined, category: string)
 }
 
 /**
+ * 取得に失敗したカテゴリの枠を戻すかどうかを判断する(Firestoreを使わない純粋な関数)。
+ *
+ * グルメ・観光は並行して取得するため、無料枠を消費した側(最初に確保した側)が
+ * 失敗しても、もう一方が成功・取得中なら、そのガチャは使われている。この場合は
+ * 枠を戻さず、ガチャの記録に残す。全てのカテゴリが失敗して記録が空になったときに、
+ * そのガチャで消費した枠を戻す。
+ *
+ * - `reservationCharged`: 今回の呼び出しで無料枠を消費したか。
+ * - `gachaCharged`: ガチャの記録が、無料枠を消費済みか(記録がなければundefined)。
+ */
+export function planRelease(
+  reservationCharged: boolean,
+  gachaCharged: boolean | undefined,
+  recorded: string[] | undefined,
+  category: string,
+): { refund: boolean; remaining: string[] } {
+  const remaining = removeCategory(recorded, category);
+  if (remaining.length > 0) return { refund: false, remaining };
+  return { refund: reservationCharged || gachaCharged === true, remaining };
+}
+
+/**
  * 無料利用の枠を確保する(チェックと加算を1トランザクションで行い、
  * 同時リクエストによる上限の突破を防ぐ)。外部API呼び出しの前に呼ぶこと。
  * 上限超過時はHttpsErrorを投げ、加算は行わない。
@@ -114,8 +136,13 @@ export async function reserveUsage(
       );
     }
     if (gachaRef) {
+      // 記録が古い形式(chargedなし)のときは、消費済みとみなす。
+      const alreadyCharged = gachaSnap?.exists
+        ? (gachaSnap.data()?.charged ?? true)
+        : false;
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
+        charged: alreadyCharged || charge,
         updatedAt: new Date(),
         expiresAt: new Date(Date.now() + GACHA_USAGE_TTL_DAYS * 24 * 60 * 60 * 1000),
       });
@@ -143,10 +170,22 @@ export async function releaseUsage(
     : undefined;
 
   await db.runTransaction(async (tx) => {
-    const userSnap = reservation.charged ? await tx.get(userRef) : undefined;
+    // 記録の読み取りが先(トランザクションでは、読み取りのあとに書き込む)。
+    const userSnap = await tx.get(userRef);
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
+    const recorded = gachaSnap?.data()?.categories as string[] | undefined;
+    const gachaCharged = gachaSnap?.exists
+      ? ((gachaSnap.data()?.charged as boolean | undefined) ?? true)
+      : undefined;
 
-    if (userSnap) {
+    const { refund, remaining } = planRelease(
+      reservation.charged,
+      gachaCharged,
+      recorded,
+      category,
+    );
+
+    if (refund) {
       const used = lifetimeUsedOf(userSnap.data());
       tx.set(
         userRef,
@@ -155,10 +194,6 @@ export async function releaseUsage(
       );
     }
     if (gachaRef && gachaSnap?.exists) {
-      const remaining = removeCategory(
-        gachaSnap.data()?.categories as string[] | undefined,
-        category,
-      );
       if (remaining.length === 0) {
         tx.delete(gachaRef);
       } else {
