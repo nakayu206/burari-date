@@ -8,7 +8,9 @@ import 'package:burari_date/domain/entities/ai_preference.dart';
 import 'package:burari_date/domain/entities/sound_settings.dart';
 import 'package:burari_date/presentation/pages/settings/ai_preference_page.dart';
 import 'package:burari_date/domain/services/sound_player.dart';
+import 'package:burari_date/presentation/pages/settings/contact_page.dart';
 import 'package:burari_date/presentation/pages/settings/sound_settings_page.dart';
+import 'package:burari_date/presentation/pages/settings/terms_page.dart';
 import 'package:burari_date/presentation/providers/sound_providers.dart';
 import 'package:burari_date/presentation/pages/settings/settings_page.dart';
 
@@ -52,6 +54,41 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SoundSettingsPage), findsOneWidget);
+    });
+  });
+
+  group('SettingsPage の項目', () {
+    testWidgets('「利用規約」と「お問い合わせ」は、別の項目として並ぶ', (tester) async {
+      _useLargeScreen(tester);
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SettingsPage())),
+      );
+
+      expect(find.text('効果音'), findsOneWidget);
+      expect(find.text('好み設定'), findsOneWidget);
+      expect(find.text('アカウント'), findsOneWidget);
+      expect(find.text('利用規約'), findsOneWidget);
+      expect(find.text('お問い合わせ'), findsOneWidget);
+      // 以前の、1つにまとめた項目は、なくなった。
+      expect(find.text('利用規約・お問い合わせ'), findsNothing);
+    });
+
+    testWidgets('「利用規約」は規約の画面、「お問い合わせ」はお問い合わせの画面に移る', (tester) async {
+      _useLargeScreen(tester);
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SettingsPage())),
+      );
+
+      await tester.tap(find.text('利用規約'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('お問い合わせ'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContactPage), findsOneWidget);
     });
   });
 

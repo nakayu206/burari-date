@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:burari_date/presentation/pages/settings/legal_texts.dart';
 import 'package:burari_date/presentation/pages/settings/terms_page.dart';
@@ -60,67 +59,18 @@ void main() {
       useTallScreen(tester);
       await tester.pumpWidget(const MaterialApp(home: TermsPage()));
 
-      expect(find.text('利用規約'), findsOneWidget);
+      expect(find.text('利用規約'), findsWidgets);
       expect(find.text('プライバシーポリシー'), findsOneWidget);
       expect(find.text('第4条(利用回数の制限と有料の機能)'), findsOneWidget);
       expect(find.text('3. 外部のサービスへの送信'), findsOneWidget);
     });
 
-    testWidgets('お問い合わせフォームのURLが空の間は「準備中」を表示し、ボタンを出さない', (tester) async {
+    testWidgets('お問い合わせは、別の画面に分けたので、この画面には出さない', (tester) async {
       useTallScreen(tester);
-      await tester.pumpWidget(
-        const MaterialApp(home: TermsPage(contactUrl: '')),
-      );
-
-      expect(find.text('お問い合わせ窓口は準備中です。'), findsOneWidget);
-      expect(find.text('お問い合わせフォームを開く'), findsNothing);
-    });
-
-    testWidgets('URLがあれば、ボタンでフォームを外部のアプリで開く', (tester) async {
-      useTallScreen(tester);
-      Uri? opened;
-      LaunchMode? openedMode;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: TermsPage(
-            contactUrl: 'https://forms.example.com/contact',
-            launchUrlOverride:
-                (uri, {mode = LaunchMode.platformDefault}) async {
-                  opened = uri;
-                  openedMode = mode;
-                  return true;
-                },
-          ),
-        ),
-      );
+      await tester.pumpWidget(const MaterialApp(home: TermsPage()));
 
       expect(find.text('お問い合わせ窓口は準備中です。'), findsNothing);
-      await tester.tap(find.text('お問い合わせフォームを開く'));
-      await tester.pumpAndSettle();
-
-      expect(opened, Uri.parse('https://forms.example.com/contact'));
-      expect(openedMode, LaunchMode.externalApplication);
-    });
-
-    testWidgets('フォームを開けなかった場合は、ダイアログで知らせる', (tester) async {
-      useTallScreen(tester);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: TermsPage(
-            contactUrl: 'https://forms.example.com/contact',
-            launchUrlOverride:
-                (uri, {mode = LaunchMode.platformDefault}) async => false,
-          ),
-        ),
-      );
-
-      await tester.tap(find.text('お問い合わせフォームを開く'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('お問い合わせフォームを開けませんでした'), findsOneWidget);
-      await tester.tap(find.text('閉じる'));
-      await tester.pumpAndSettle();
-      expect(find.text('お問い合わせフォームを開けませんでした'), findsNothing);
+      expect(find.text('お問い合わせフォームを開く'), findsNothing);
     });
   });
 }

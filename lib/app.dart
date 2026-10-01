@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'core/config/flavor.dart';
 import 'core/constants/app_colors.dart';
+import 'presentation/pages/consent/consent_gate.dart';
 import 'presentation/pages/home/home_page.dart';
 
 /// アプリのルートWidget。
@@ -16,7 +17,7 @@ class BurariDateApp extends ConsumerWidget {
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      home: const HomePage(),
+      home: const ConsentGate(child: HomePage()),
     );
   }
 
