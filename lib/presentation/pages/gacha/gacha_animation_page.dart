@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/config/gacha_flap_timing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
@@ -23,20 +24,8 @@ const _kTrainFaceAsset = 'assets/images/train_face.png';
 
 // このファイルのアニメーション設計は、ユーザー提供の参考実装(gacha_split_flap_train_bg_sunny.html)をベースに、行(駅数/到着駅名)ごとに1枚のカードとして扱い、文字の見えない空フリップを数回行った後に行全体の文字列を1回のフリップで確定させる。
 
-/// 空フリップ(まだ文字を明かさない、ぐるぐる感のためだけのフリップ)1回分の時間。
-const _kBlankFlipMs = 110;
-
-/// 最終文字列を明かす確定フリップの時間。空フリップよりわずかに長くして「めくれて出てくる」瞬間に間を持たせる。
-const _kRevealFlipMs = 260;
-
-/// カードが確定するまでに行う空フリップの回数(確定の1回は含まない)。
-const _kBlankSpinCount = 5;
-
-/// 1枚のフリップカードが確定するまでの所要時間(空フリップ×回数 + 確定フリップ)。
-const _kFlapCardTotalMs = _kBlankFlipMs * _kBlankSpinCount + _kRevealFlipMs;
-
-const _kBlankFlipDuration = Duration(milliseconds: _kBlankFlipMs);
-const _kRevealFlipDuration = Duration(milliseconds: _kRevealFlipMs);
+const _kBlankFlipDuration = Duration(milliseconds: kFlapBlankFlipMs);
+const _kRevealFlipDuration = Duration(milliseconds: kFlapRevealFlipMs);
 
 /// 上段(駅数)が確定してから下段(到着駅名)のフリップが始まるまでの間。
 const _kInterRowPause = Duration(milliseconds: 800);
@@ -140,7 +129,7 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   }
 
   /// 1枚のフリップカードが確定するまでの時間。
-  static const _rowDuration = Duration(milliseconds: _kFlapCardTotalMs);
+  static const _rowDuration = Duration(milliseconds: kFlapCardTotalMs);
 
   void _runSequence() {
     _sequenceTimer?.cancel();
@@ -537,7 +526,7 @@ class _FlapCardState extends State<_FlapCard>
 
   /// 文字を明かさない空フリップを数回行ってから、最後に[text]を1回のフリップで確定させる。
   Future<void> _runSpins() async {
-    for (var i = 0; i < _kBlankSpinCount; i++) {
+    for (var i = 0; i < kFlapBlankSpinCount; i++) {
       if (!mounted) return;
       _nextText = _kPlaceholderChar;
       await _controller.forward(from: 0);

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:burari_date/core/config/gacha_flap_timing.dart';
+
 /// ガチャ演出の効果音を、プログラムで作って `assets/sounds/` に書き出す(Issue #64)。
 ///
 /// 昔の駅の発車標(反転フラップ式)の「パタパタ」と、蒸気機関車の汽笛の
@@ -214,39 +216,56 @@ void _write(String name, List<double> samples) {
 }
 
 void main() {
-  final random = Random(20261001);
+  // 音ごとに別の固定シードの乱数を使い、ある音の作りを変えても、他の音の波形が
+  // 変わらないようにする。
+  final flipRandom = Random(20261001);
+  final confirmRandom = Random(20261002);
+  final decideRandom = Random(20261003);
 
-  // 110msごとの動きに、板が離れる音と当たる音を対応させる。
+  // 画面側と同じ時間の定数(gacha_flap_timing.dart)で組み、画面の速度を変えても
+  // 音がずれないようにする。
+  // フリップ1回ごとの動きに、板が離れる音と当たる音を対応させる。
   // 連打を詰めすぎず「パタ・パタ」と聞き取れる間隔にする。
-  // gacha_animation_page.dartの_kFlapCardTotalMs(810ms)に合わせる。
   final flipParts = <(double, List<double>)>[];
   const flipPitch = 1.2; // 板の響きを残しつつ、パタパタ音を少し高めにする。
-  for (var k = 0; k < 5; k++) {
-    final base = k * 110.0;
+  for (var k = 0; k < kFlapBlankSpinCount; k++) {
+    final base = k * kFlapBlankFlipMs.toDouble();
     const clacks = 2;
     for (var c = 0; c < clacks; c++) {
       // 強さと音の高さに少しばらつきをつける。
       final at = base + c * 43;
-      final volume = (c == 0 ? 0.72 : 1.0) * (0.9 + random.nextDouble() * 0.2);
-      final pitch = (0.88 + random.nextDouble() * 0.16) * flipPitch;
-      flipParts.add((at, _clack(random, pitch: pitch, volume: volume * 0.8)));
+      final volume =
+          (c == 0 ? 0.72 : 1.0) * (0.9 + flipRandom.nextDouble() * 0.2);
+      final pitch = (0.88 + flipRandom.nextDouble() * 0.16) * flipPitch;
+      flipParts.add((
+        at,
+        _clack(flipRandom, pitch: pitch, volume: volume * 0.8),
+      ));
     }
   }
-  flipParts.add((550, _clack(random, pitch: 1.1 * flipPitch, volume: 0.75)));
-  flipParts.add((665, _clack(random, pitch: 0.95 * flipPitch, volume: 0.85)));
+  // 確定フリップ(空フリップのあと)の中の、3回の当たる音。
+  const revealAt = kFlapBlankFlipMs * kFlapBlankSpinCount;
   flipParts.add((
-    740,
-    _clack(random, pitch: 0.82 * flipPitch, volume: 1.0, heavy: 0.3),
+    revealAt.toDouble(),
+    _clack(flipRandom, pitch: 1.1 * flipPitch, volume: 0.75),
   ));
-  _write('flip', _normalize(_mix(810, flipParts), 0.72));
+  flipParts.add((
+    revealAt + 115.0,
+    _clack(flipRandom, pitch: 0.95 * flipPitch, volume: 0.85),
+  ));
+  flipParts.add((
+    revealAt + 190.0,
+    _clack(flipRandom, pitch: 0.82 * flipPitch, volume: 1.0, heavy: 0.3),
+  ));
+  _write('flip', _normalize(_mix(kFlapCardTotalMs, flipParts), 0.72));
 
   // 確定音: 上段が決まったときの、重めの「パタン」(板が最後に落ちる音)。
   _write(
     'confirm',
     _normalize(
       _mix(320, [
-        (0, _clack(random, pitch: 1.1, volume: 0.7)),
-        (28, _clack(random, pitch: 0.92, volume: 1.0, heavy: 0.25)),
+        (0, _clack(confirmRandom, pitch: 1.1, volume: 0.7)),
+        (28, _clack(confirmRandom, pitch: 0.92, volume: 1.0, heavy: 0.25)),
       ]),
       0.6,
     ),
@@ -260,8 +279,11 @@ void main() {
       _echo(
         _mix(1900, [
           // 同じ汽笛を短く、長く。2音目を別の音程にしない。
-          (0, _whistle(random, 440, 180, scoop: 0.045)),
-          (290, _whistle(random, 440, 1100, vibratoHz: 3.2, scoop: 0.045)),
+          (0, _whistle(decideRandom, 440, 180, scoop: 0.045)),
+          (
+            290,
+            _whistle(decideRandom, 440, 1100, vibratoHz: 3.2, scoop: 0.045),
+          ),
         ]),
       ),
       0.55,
