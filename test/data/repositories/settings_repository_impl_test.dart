@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:burari_date/data/repositories/settings_repository_impl.dart';
 import 'package:burari_date/domain/entities/ai_preference.dart';
-import 'package:burari_date/domain/entities/notification_settings.dart';
+import 'package:burari_date/domain/entities/sound_settings.dart';
 
 void main() {
   late SettingsRepositoryImpl repository;
@@ -13,34 +13,47 @@ void main() {
     repository = SettingsRepositoryImpl();
   });
 
-  group('通知設定', () {
+  group('効果音の設定', () {
     test('保存済みの値がなければ初期値を返す', () async {
-      expect(
-        await repository.loadNotificationSettings(),
-        const NotificationSettings(),
-      );
+      expect(await repository.loadSoundSettings(), const SoundSettings());
     });
 
     test('保存した値を読み込める', () async {
-      const settings = NotificationSettings(
-        isNotificationEnabled: false,
-        isSoundEnabled: false,
-        isHistoryUpdateNotificationEnabled: true,
+      const settings = SoundSettings(isSoundEnabled: false);
+
+      await repository.saveSoundSettings(settings);
+
+      expect(await repository.loadSoundSettings(), settings);
+    });
+
+    test('以前の「通知設定」で保存した効果音の値を、引き継いで読み込む', () async {
+      SharedPreferences.setMockInitialValues({
+        'settings.notification.sound': false,
+      });
+
+      expect(
+        await SettingsRepositoryImpl().loadSoundSettings(),
+        const SoundSettings(isSoundEnabled: false),
       );
+    });
 
-      await repository.saveNotificationSettings(settings);
+    test('新しいキーの値が、以前のキーより優先される', () async {
+      SharedPreferences.setMockInitialValues({
+        'settings.notification.sound': false,
+        'settings.sound.enabled': true,
+      });
 
-      expect(await repository.loadNotificationSettings(), settings);
+      expect(
+        await SettingsRepositoryImpl().loadSoundSettings(),
+        const SoundSettings(isSoundEnabled: true),
+      );
     });
 
     test('新しいインスタンスからも保存済みの値を読み込める(永続化)', () async {
-      const settings = NotificationSettings(isSoundEnabled: false);
-      await repository.saveNotificationSettings(settings);
+      const settings = SoundSettings(isSoundEnabled: false);
+      await repository.saveSoundSettings(settings);
 
-      expect(
-        await SettingsRepositoryImpl().loadNotificationSettings(),
-        settings,
-      );
+      expect(await SettingsRepositoryImpl().loadSoundSettings(), settings);
     });
   });
 

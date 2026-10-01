@@ -6,7 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
 import 'account_page.dart';
 import 'ai_preference_page.dart';
-import 'notification_settings_page.dart';
+import 'sound_settings_page.dart';
 import 'terms_page.dart';
 
 /// S-08 設定画面
@@ -14,7 +14,7 @@ class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   static final _items = <(String, WidgetBuilder)>[
-    ('通知設定', (_) => const NotificationSettingsPage()),
+    ('効果音', (_) => const SoundSettingsPage()),
     ('AI提案の好み設定', (_) => const AiPreferencePage()),
     ('アカウント', (_) => const AccountPage()),
     ('利用規約・お問い合わせ', (_) => const TermsPage()),

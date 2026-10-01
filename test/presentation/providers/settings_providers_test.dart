@@ -3,18 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:burari_date/domain/entities/ai_preference.dart';
-import 'package:burari_date/domain/entities/notification_settings.dart';
+import 'package:burari_date/domain/entities/sound_settings.dart';
 import 'package:burari_date/domain/repositories/settings_repository.dart';
 import 'package:burari_date/presentation/providers/settings_providers.dart';
 
 /// 保存だけ常に失敗させるリポジトリ。
 class _FailingSaveRepository implements SettingsRepository {
   @override
-  Future<NotificationSettings> loadNotificationSettings() async =>
-      const NotificationSettings();
+  Future<SoundSettings> loadSoundSettings() async => const SoundSettings();
 
   @override
-  Future<void> saveNotificationSettings(NotificationSettings settings) =>
+  Future<void> saveSoundSettings(SoundSettings settings) =>
       Future.error(Exception('save failed'));
 
   @override
@@ -31,26 +30,26 @@ class _FailingSaveRepository implements SettingsRepository {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  group('notificationSettingsProvider', () {
+  group('soundSettingsProvider', () {
     test('変更すると状態に反映され、作り直したContainerでも保持される', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      await container.read(notificationSettingsProvider.future);
+      await container.read(soundSettingsProvider.future);
 
       await container
-          .read(notificationSettingsProvider.notifier)
-          .save(const NotificationSettings(isSoundEnabled: false));
+          .read(soundSettingsProvider.notifier)
+          .save(const SoundSettings(isSoundEnabled: false));
 
       expect(
-        container.read(notificationSettingsProvider).value,
-        const NotificationSettings(isSoundEnabled: false),
+        container.read(soundSettingsProvider).value,
+        const SoundSettings(isSoundEnabled: false),
       );
 
       final reopened = ProviderContainer();
       addTearDown(reopened.dispose);
       expect(
-        await reopened.read(notificationSettingsProvider.future),
-        const NotificationSettings(isSoundEnabled: false),
+        await reopened.read(soundSettingsProvider.future),
+        const SoundSettings(isSoundEnabled: false),
       );
     });
 
@@ -63,18 +62,18 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      await container.read(notificationSettingsProvider.future);
+      await container.read(soundSettingsProvider.future);
 
       await expectLater(
         container
-            .read(notificationSettingsProvider.notifier)
-            .save(const NotificationSettings(isSoundEnabled: false)),
+            .read(soundSettingsProvider.notifier)
+            .save(const SoundSettings(isSoundEnabled: false)),
         throwsException,
       );
 
       expect(
-        container.read(notificationSettingsProvider).value,
-        const NotificationSettings(),
+        container.read(soundSettingsProvider).value,
+        const SoundSettings(),
       );
     });
   });

@@ -5,9 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:burari_date/data/repositories/settings_repository_impl.dart';
 import 'package:burari_date/domain/entities/ai_preference.dart';
-import 'package:burari_date/domain/entities/notification_settings.dart';
+import 'package:burari_date/domain/entities/sound_settings.dart';
 import 'package:burari_date/presentation/pages/settings/ai_preference_page.dart';
-import 'package:burari_date/presentation/pages/settings/notification_settings_page.dart';
+import 'package:burari_date/presentation/pages/settings/sound_settings_page.dart';
 import 'package:burari_date/presentation/pages/settings/settings_page.dart';
 
 void _useLargeScreen(WidgetTester tester) {
@@ -28,14 +28,14 @@ void main() {
         const ProviderScope(child: MaterialApp(home: SettingsPage())),
       );
 
-      await tester.tap(find.text('通知設定'));
+      await tester.tap(find.text('効果音'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(NotificationSettingsPage), findsOneWidget);
+      expect(find.byType(SoundSettingsPage), findsOneWidget);
     });
   });
 
-  group('NotificationSettingsPage', () {
+  group('SoundSettingsPage', () {
     testWidgets('保存済みの設定が画面に反映される', (tester) async {
       _useLargeScreen(tester);
       SharedPreferences.setMockInitialValues({
@@ -43,9 +43,7 @@ void main() {
       });
 
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(home: NotificationSettingsPage()),
-        ),
+        const ProviderScope(child: MaterialApp(home: SoundSettingsPage())),
       );
       await tester.pumpAndSettle();
 
@@ -59,9 +57,7 @@ void main() {
       _useLargeScreen(tester);
 
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(home: NotificationSettingsPage()),
-        ),
+        const ProviderScope(child: MaterialApp(home: SoundSettingsPage())),
       );
       await tester.pumpAndSettle();
 
@@ -69,28 +65,39 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        await SettingsRepositoryImpl().loadNotificationSettings(),
-        const NotificationSettings(isSoundEnabled: false),
+        await SettingsRepositoryImpl().loadSoundSettings(),
+        const SoundSettings(isSoundEnabled: false),
       );
     });
 
-    testWidgets('「通知を受け取る」がオフの間は他のスイッチを操作できない', (tester) async {
+    testWidgets('以前の「通知設定」で保存した値も、引き継いで表示する', (tester) async {
       _useLargeScreen(tester);
       SharedPreferences.setMockInitialValues({
-        'settings.notification.enabled': false,
+        'settings.notification.sound': false,
       });
 
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(home: NotificationSettingsPage()),
-        ),
+        const ProviderScope(child: MaterialApp(home: SoundSettingsPage())),
       );
       await tester.pumpAndSettle();
 
       final soundSwitch = tester.widget<SwitchListTile>(
         find.widgetWithText(SwitchListTile, 'ガチャ演出の効果音'),
       );
-      expect(soundSwitch.onChanged, isNull);
+      expect(soundSwitch.value, isFalse);
+    });
+
+    testWidgets('通知のスイッチは出さない(送る通知がないため)', (tester) async {
+      _useLargeScreen(tester);
+
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SoundSettingsPage())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SwitchListTile), findsOneWidget);
+      expect(find.text('通知を受け取る'), findsNothing);
+      expect(find.text('履歴の更新通知'), findsNothing);
     });
   });
 
