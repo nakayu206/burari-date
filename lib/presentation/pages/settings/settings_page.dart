@@ -15,7 +15,7 @@ class SettingsPage extends StatelessWidget {
 
   static final _items = <(String, WidgetBuilder)>[
     ('効果音', (_) => const SoundSettingsPage()),
-    ('AI提案の好み設定', (_) => const AiPreferencePage()),
+    ('好み設定', (_) => const AiPreferencePage()),
     ('アカウント', (_) => const AccountPage()),
     ('利用規約・お問い合わせ', (_) => const TermsPage()),
   ];

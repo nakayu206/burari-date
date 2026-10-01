@@ -17,10 +17,11 @@ class AudioplayersSoundPlayer implements SoundPlayer {
   static String _assetOf(GachaSound sound) => 'sounds/${sound.name}.wav';
 
   @override
-  Future<void> play(GachaSound sound) async {
+  Future<void> play(GachaSound sound, {double volume = 1.0}) async {
     try {
       final player = _players[sound]!;
       await player.stop();
+      await player.setVolume(volume.clamp(0.0, 1.0));
       await player.play(AssetSource(_assetOf(sound)));
     } catch (e) {
       // 効果音は、鳴らせなくても演出の進行には影響しない。

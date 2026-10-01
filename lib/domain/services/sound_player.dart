@@ -12,9 +12,9 @@ enum GachaSound {
 
 /// 効果音を鳴らす。鳴らす・鳴らさないの判断(設定)は、呼び出し側が行う。
 abstract interface class SoundPlayer {
-  /// [sound]を鳴らす。鳴らせなくても例外を投げない(効果音は、なくても
-  /// アプリの動作に影響しないため)。
-  Future<void> play(GachaSound sound);
+  /// [sound]を[volume](0.0〜1.0)で鳴らす。鳴らせなくても例外を投げない(効果音は、
+  /// なくてもアプリの動作に影響しないため)。
+  Future<void> play(GachaSound sound, {double volume = 1.0});
 
   /// 鳴らしている音を、すべて止める(スキップ・画面を閉じるとき)。
   Future<void> stopAll();

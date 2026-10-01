@@ -5,7 +5,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/sound_settings.dart';
+import '../../../domain/services/sound_player.dart';
 import '../../providers/settings_providers.dart';
+import '../../providers/sound_providers.dart';
 import '../../widgets/settings_save_error_dialog.dart';
 
 /// 効果音の設定画面。
@@ -70,6 +72,32 @@ class SoundSettingsPage extends ConsumerWidget {
                     fontSize: AppFontSizes.labelSmall,
                   ),
                 ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '音量 ${(value.volume * 100).round()}%',
+                style: TextStyle(
+                  color: value.isSoundEnabled
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontSize: AppFontSizes.bodyMedium,
+                ),
+              ),
+              Slider(
+                value: value.volume,
+                divisions: 10,
+                activeColor: AppColors.primary,
+                label: '${(value.volume * 100).round()}%',
+                // 効果音をオフにしている間は、音量を変えても意味がない。
+                onChanged: value.isSoundEnabled
+                    ? (v) => _save(context, ref, value.copyWith(volume: v))
+                    : null,
+                // 離したときに、その音量で試し聞きの音を鳴らす。
+                onChangeEnd: value.isSoundEnabled
+                    ? (v) => ref
+                          .read(soundPlayerProvider)
+                          .play(GachaSound.confirm, volume: v)
+                    : null,
               ),
             ],
           ),

@@ -13,11 +13,15 @@ import 'package:burari_date/presentation/providers/sound_providers.dart';
 /// 鳴らした音を記録するだけの偽のプレイヤー。
 class _FakeSoundPlayer implements SoundPlayer {
   final played = <GachaSound>[];
+  final volumes = <double>[];
   int stopAllCount = 0;
   bool isDisposed = false;
 
   @override
-  Future<void> play(GachaSound sound) async => played.add(sound);
+  Future<void> play(GachaSound sound, {double volume = 1.0}) async {
+    played.add(sound);
+    volumes.add(volume);
+  }
 
   @override
   Future<void> stopAll() async => stopAllCount++;
@@ -103,6 +107,19 @@ void main() {
 
     // 残りのタイマーを進めて、演出を終わらせる。
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('保存した音量で鳴らす', (tester) async {
+    SharedPreferences.setMockInitialValues({'settings.sound.volume': 0.4});
+    final player = await pumpPage(tester);
+
+    await tester.tap(find.text('ガチャる'));
+    await tester.pump();
+    await tester.pump(rowMs);
+
+    expect(player.volumes, [0.4, 0.4]);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('効果音がオフなら、何も鳴らさない', (tester) async {

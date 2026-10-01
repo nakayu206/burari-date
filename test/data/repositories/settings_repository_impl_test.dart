@@ -37,6 +37,22 @@ void main() {
       );
     });
 
+    test('音量は初期値が最大で、保存した値を読み込める', () async {
+      expect((await repository.loadSoundSettings()).volume, 1.0);
+
+      await repository.saveSoundSettings(const SoundSettings(volume: 0.3));
+
+      expect((await repository.loadSoundSettings()).volume, 0.3);
+    });
+
+    test('範囲外の音量が保存されていても、0〜1に収める', () async {
+      SharedPreferences.setMockInitialValues({'settings.sound.volume': 5.0});
+      expect((await SettingsRepositoryImpl().loadSoundSettings()).volume, 1.0);
+
+      SharedPreferences.setMockInitialValues({'settings.sound.volume': -2.0});
+      expect((await SettingsRepositoryImpl().loadSoundSettings()).volume, 0.0);
+    });
+
     test('新しいキーの値が、以前のキーより優先される', () async {
       SharedPreferences.setMockInitialValues({
         'settings.notification.sound': false,
@@ -57,7 +73,7 @@ void main() {
     });
   });
 
-  group('AI提案の好み設定', () {
+  group('好み設定', () {
     test('保存済みの値がなければ初期値を返す', () async {
       expect(await repository.loadAiPreference(), const AiPreference());
     });

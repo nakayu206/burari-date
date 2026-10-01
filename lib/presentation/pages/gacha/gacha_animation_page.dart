@@ -10,6 +10,7 @@ import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_train_colors.dart';
 import '../../../domain/entities/gacha_result.dart';
+import '../../../domain/entities/sound_settings.dart';
 import '../../../domain/services/sound_player.dart';
 import '../../providers/gacha_form_provider.dart';
 import '../../providers/settings_providers.dart';
@@ -108,10 +109,10 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   /// 効果音を鳴らす。設定がオフのときは鳴らさない。設定を読み込み中の間は、
   /// 初期値(オン)として扱う。
   void _play(GachaSound sound) {
-    final isEnabled =
-        ref.read(soundSettingsProvider).value?.isSoundEnabled ?? true;
-    if (!isEnabled) return;
-    unawaited(_soundPlayer.play(sound));
+    final settings =
+        ref.read(soundSettingsProvider).value ?? const SoundSettings();
+    if (!settings.isSoundEnabled) return;
+    unawaited(_soundPlayer.play(sound, volume: settings.volume));
   }
 
   /// 「ガチャる」ボタン押下でフリップ演出を開始する。

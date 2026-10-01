@@ -10,6 +10,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   static const _kSoundEnabled = 'settings.sound.enabled';
   // 以前の「通知設定」画面で保存していたキー。移行のため、新しいキーがなければ読む。
   static const _kLegacySoundEnabled = 'settings.notification.sound';
+  static const _kSoundVolume = 'settings.sound.volume';
   static const _kAiGenres = 'settings.ai.genres';
   static const _kAiBudget = 'settings.ai.budget';
   static const _kAiMood = 'settings.ai.mood';
@@ -23,6 +24,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
           prefs.getBool(_kSoundEnabled) ??
           prefs.getBool(_kLegacySoundEnabled) ??
           defaults.isSoundEnabled,
+      // 範囲外の値が保存されていても、0〜1に収める。
+      volume: (prefs.getDouble(_kSoundVolume) ?? defaults.volume).clamp(
+        0.0,
+        1.0,
+      ),
     );
   }
 
@@ -30,6 +36,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   Future<void> saveSoundSettings(SoundSettings settings) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSoundEnabled, settings.isSoundEnabled);
+    await prefs.setDouble(_kSoundVolume, settings.volume.clamp(0.0, 1.0));
   }
 
   @override
