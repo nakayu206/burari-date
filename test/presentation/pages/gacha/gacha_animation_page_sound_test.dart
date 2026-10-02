@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,9 @@ class _FakeSoundPlayer implements SoundPlayer {
   final played = <GachaSound>[];
   final volumes = <double>[];
   int stopAllCount = 0;
+
+  /// 設定すると、stopAllの完了を、これが完了するまで遅らせる。
+  Completer<void>? stopGate;
   bool isDisposed = false;
 
   @override
@@ -24,7 +29,10 @@ class _FakeSoundPlayer implements SoundPlayer {
   }
 
   @override
-  Future<void> stopAll() async => stopAllCount++;
+  Future<void> stopAll() async {
+    stopAllCount++;
+    await stopGate?.future;
+  }
 
   @override
   Future<void> dispose() async => isDisposed = true;
@@ -148,6 +156,26 @@ void main() {
     await tester.pump();
 
     expect(player.stopAllCount, greaterThan(stopsBefore));
+    expect(player.played, [GachaSound.flip, GachaSound.decide]);
+
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('スキップで、音の停止が遅れても、決定音は停止が終わってから鳴らす(止められない)', (tester) async {
+    final player = await pumpPage(tester);
+    await tester.tap(find.text('ガチャる'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 停止が終わらない間にスキップする。
+    player.stopGate = Completer<void>();
+    await tester.tapAt(const Offset(200, 300));
+    await tester.pump();
+    expect(player.played, [GachaSound.flip]);
+
+    // 停止が終わったあとに、決定音を鳴らす。
+    player.stopGate!.complete();
+    await tester.pump();
     expect(player.played, [GachaSound.flip, GachaSound.decide]);
 
     await tester.pump(const Duration(seconds: 2));

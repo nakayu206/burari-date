@@ -18,6 +18,46 @@ void main() {
       longitude: 139.70,
     );
 
+    test('呼び出しの前にログインを確かめ、失敗したら、取得せずにエラーにする', () async {
+      var called = false;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          called = true;
+          return {'candidates': []};
+        },
+        ensureSignedIn: () async => throw Exception('network'),
+      );
+
+      await expectLater(
+        repository.getCandidates(
+          arrival,
+          CandidateCategory.gourmet,
+          gachaId: 'g1',
+        ),
+        throwsA(isA<CandidateFetchException>()),
+      );
+      expect(called, isFalse);
+    });
+
+    test('ログインを確かめてから、候補を取得する', () async {
+      final order = <String>[];
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          order.add('call');
+          return {'candidates': []};
+        },
+        ensureSignedIn: () async => order.add('signIn'),
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
+
+      expect(order, ['signIn', 'call']);
+    });
+
     test('バックエンドのレスポンスをCandidateに変換する', () async {
       final repository = CandidateRepositoryImpl(
         callable: (data) async => {
