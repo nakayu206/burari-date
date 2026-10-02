@@ -5,6 +5,21 @@ import 'package:burari_date/data/repositories/settings_repository_impl.dart';
 import 'package:burari_date/domain/entities/ai_preference.dart';
 import 'package:burari_date/domain/entities/sound_settings.dart';
 
+/// 書き込みが全てfalse(失敗)を返す偽のSharedPreferences。
+class _FailingPrefs extends Fake implements SharedPreferences {
+  @override
+  Future<bool> setBool(String key, bool value) async => false;
+
+  @override
+  Future<bool> setDouble(String key, double value) async => false;
+
+  @override
+  Future<bool> setString(String key, String value) async => false;
+
+  @override
+  Future<bool> setStringList(String key, List<String> value) async => false;
+}
+
 void main() {
   late SettingsRepositoryImpl repository;
 
@@ -111,6 +126,26 @@ void main() {
       await repository.saveAiPreference(const AiPreference(genres: {}));
 
       expect((await repository.loadAiPreference()).genres, isEmpty);
+    });
+  });
+
+  group('保存の失敗', () {
+    final failing = SettingsRepositoryImpl(
+      preferences: () async => _FailingPrefs(),
+    );
+
+    test('効果音の設定を保存できなかったら、成功にせず例外を投げる', () async {
+      await expectLater(
+        failing.saveSoundSettings(const SoundSettings(isSoundEnabled: false)),
+        throwsStateError,
+      );
+    });
+
+    test('好み設定を保存できなかったら、成功にせず例外を投げる', () async {
+      await expectLater(
+        failing.saveAiPreference(const AiPreference(mood: 'レトロ')),
+        throwsStateError,
+      );
     });
   });
 }
