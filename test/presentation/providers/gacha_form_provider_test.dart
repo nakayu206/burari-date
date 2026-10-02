@@ -210,4 +210,61 @@ void main() {
       );
     });
   });
+
+  group('進めない方面の扱い', () {
+    const stations = [
+      Station(id: 'a', name: 'A駅', lineId: 'l', orderIndex: 0),
+      Station(id: 'b', name: 'B駅', lineId: 'l', orderIndex: 1),
+      Station(id: 'c', name: 'C駅', lineId: 'l', orderIndex: 2),
+    ];
+    const line = RailwayLine(id: 'l', name: 'テスト線', stations: stations);
+
+    ProviderContainer makeContainer() {
+      final container = ProviderContainer(
+        overrides: [
+          stationRepositoryProvider.overrideWithValue(
+            const _ImmediateStationRepository(line),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('終点を選ぶと、進めない方面(up)は含まれない', () async {
+      final container = makeContainer();
+      await container
+          .read(gachaFormProvider.notifier)
+          .selectDeparture(stations[2]);
+
+      expect(container.read(gachaFormProvider).reachableDirections, {
+        GachaDirection.down,
+      });
+    });
+
+    test('選んでいた方面に進めない駅に変えたら、おまかせに戻す', () async {
+      final container = makeContainer();
+      final notifier = container.read(gachaFormProvider.notifier);
+      await notifier.selectDeparture(stations[1]);
+      notifier.updateDirection(GachaDirection.up);
+
+      await notifier.selectDeparture(stations[2]);
+
+      expect(
+        container.read(gachaFormProvider).direction,
+        GachaDirection.random,
+      );
+    });
+
+    test('進める方面なら、選んでいた方面のまま', () async {
+      final container = makeContainer();
+      final notifier = container.read(gachaFormProvider.notifier);
+      await notifier.selectDeparture(stations[1]);
+      notifier.updateDirection(GachaDirection.up);
+
+      await notifier.selectDeparture(stations[0]);
+
+      expect(container.read(gachaFormProvider).direction, GachaDirection.up);
+    });
+  });
 }

@@ -45,6 +45,16 @@ class GachaFormState {
 
   bool get canStartGacha => departure != null && line != null;
 
+  /// 出発駅から進める方面。路線が決まるまでは、どちらも出しておく。
+  Set<GachaDirection> get reachableDirections {
+    final departure = this.departure;
+    final line = this.line;
+    if (departure == null || line == null) {
+      return {GachaDirection.up, GachaDirection.down};
+    }
+    return line.reachableDirections(departure);
+  }
+
   /// 現在選択中の路線に対する駅数範囲の実用上限(kMaxSelectableStops参照)。
   int get maxSelectableStops {
     final line = this.line;
@@ -117,12 +127,17 @@ class GachaFormNotifier extends Notifier<GachaFormState> {
         ? maxSelectable
         : state.maxStops;
     final newMin = state.minStops > newMax ? newMax : state.minStops;
+    // 選んでいた方面に進めない駅(終点など)なら、おまかせに戻す。
+    final keepsDirection =
+        state.direction == GachaDirection.random ||
+        line == null ||
+        line.reachableDirections(station).contains(state.direction);
     state = GachaFormState(
       departure: station,
       line: line,
       minStops: newMin,
       maxStops: newMax,
-      direction: state.direction,
+      direction: keepsDirection ? state.direction : GachaDirection.random,
       lineError: error,
     );
   }
