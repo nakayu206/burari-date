@@ -153,21 +153,26 @@ class StationSelectPage extends ConsumerWidget {
                 expandedInsets: EdgeInsets.zero,
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(
-                    value: GachaDirection.up,
-                    // 見出しに既に「方面」とあるため、ここでは繰り返さず
-                    // 駅名だけにして文字数を減らす(長い駅名でも読める
-                    // ようにするため)。
-                    label: _DirectionLabel(
-                      line == null ? '○○' : line.endTerminus.name,
+                  // 出発駅から進めない方面(終点など、先のない方面)は出さない。
+                  if (formState.reachableDirections.contains(GachaDirection.up))
+                    ButtonSegment(
+                      value: GachaDirection.up,
+                      // 見出しに既に「方面」とあるため、ここでは繰り返さず
+                      // 駅名だけにして文字数を減らす(長い駅名でも読める
+                      // ようにするため)。
+                      label: _DirectionLabel(
+                        line == null ? '○○' : line.endTerminus.name,
+                      ),
                     ),
-                  ),
-                  ButtonSegment(
-                    value: GachaDirection.down,
-                    label: _DirectionLabel(
-                      line == null ? '△△' : line.startTerminus.name,
+                  if (formState.reachableDirections.contains(
+                    GachaDirection.down,
+                  ))
+                    ButtonSegment(
+                      value: GachaDirection.down,
+                      label: _DirectionLabel(
+                        line == null ? '△△' : line.startTerminus.name,
+                      ),
                     ),
-                  ),
                   const ButtonSegment(
                     value: GachaDirection.random,
                     label: _DirectionLabel('おまかせ'),
