@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parsePicks, toCandidates } from "./ai";
+import { extractText, parsePicks, requireCandidates, toCandidates } from "./ai";
 import type { RawPlace } from "./types";
 
 const place = (id: string): RawPlace => ({ id, name: id });
@@ -81,4 +81,23 @@ test("候補に、ジャンル名と予算の目安を引き継ぐ", () => {
   );
   assert.equal(candidate.categoryName, "中華");
   assert.equal(candidate.budget, "900円");
+});
+
+test("応答にテキストがなければ、空の結果にせず例外を投げる", () => {
+  assert.throws(() => extractText({}), /テキスト/);
+  assert.throws(() => extractText({ content: [] }), /テキスト/);
+  assert.throws(() => extractText({ content: [{ type: "text", text: "  " }] }), /テキスト/);
+  assert.equal(extractText({ content: [{ type: "text", text: "[]" }] }), "[]");
+});
+
+test("存在しない番号だけを返した応答は、候補0件の正常結果にせず例外を投げる", () => {
+  const picks = parsePicks('[{"index": 99, "catchCopy": "a", "reason": "b"}]');
+  const candidates = toCandidates(picks, [place("a")], "gourmet");
+  assert.throws(() => requireCandidates(candidates), /候補/);
+});
+
+test("候補が1件でもあれば、そのまま返す", () => {
+  const picks = parsePicks('[{"index": 0, "catchCopy": "a", "reason": "b"}]');
+  const candidates = toCandidates(picks, [place("a")], "gourmet");
+  assert.equal(requireCandidates(candidates).length, 1);
 });

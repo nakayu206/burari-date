@@ -45,8 +45,35 @@ export async function generateCandidates(
   const body = (await res.json()) as {
     content?: { type: string; text?: string }[];
   };
-  const text = body.content?.find((c) => c.type === "text")?.text ?? "[]";
-  return toCandidates(parsePicks(text), targets, category);
+  const text = extractText(body);
+  return requireCandidates(toCandidates(parsePicks(text), targets, category));
+}
+
+/**
+ * Claudeの応答からテキストを取り出す。テキストがなければ例外を投げる
+ * (空の応答を「候補なし」の正常結果にすると、無料枠だけ消費してしまうため)。
+ */
+export function extractText(body: {
+  content?: { type: string; text?: string }[];
+}): string {
+  const text = body.content?.find((c) => c.type === "text")?.text;
+  if (typeof text !== "string" || text.trim() === "") {
+    throw new Error("Claude APIの応答にテキストがありませんでした");
+  }
+  return text;
+}
+
+/**
+ * 実データがあるのに、使える候補が1件も残らなかった場合は、AIの不正な応答
+ * (存在しない番号だけを返した等)として例外を投げる。周辺に施設が実際に
+ * ない場合(実データが0件)は、generateCandidatesの冒頭で空配列を返しており、
+ * ここには来ない。
+ */
+export function requireCandidates<T>(candidates: T[]): T[] {
+  if (candidates.length === 0) {
+    throw new Error("Claude APIの応答から、使える候補を得られませんでした");
+  }
+  return candidates;
 }
 
 /** AIの選出結果(pick)を実データと突き合わせ、重複除去・件数上限を適用してCandidateに変換する */
