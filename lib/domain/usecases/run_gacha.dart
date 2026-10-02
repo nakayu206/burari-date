@@ -33,7 +33,11 @@ class RunGacha {
     // ランダム方向は、移動できない方向(終端駅でその先が無い方向)を除外して
     // 選ぶ。除外しないと、非環状路線の終端で外向きが選ばれた場合にstopsCount
     // が強制的に0になり、駅数指定を無視して出発駅がそのまま当選してしまう。
-    final resolvedDirection = direction == GachaDirection.random
+    // 方向を指定していても、その方向に進めないときは同じ扱いにする(画面は進め
+    // ない方面を出さないが、0駅移動で出発駅が当たる事態を防ぐ最後の守り)。
+    final resolvedDirection =
+        direction == GachaDirection.random ||
+            !line.reachableDirections(departure).contains(direction)
         ? _resolveRandomDirection(line.isCircular, upReachable, downReachable)
         : direction;
 

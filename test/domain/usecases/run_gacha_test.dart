@@ -45,6 +45,31 @@ void main() {
       expect(result.arrivalStation.orderIndex, 4 - result.stopsCount);
     });
 
+    test('進めない方向を指定しても、出発駅が当たらず、進める方向に解決される', () {
+      // 終点(s4)からupには進めない。
+      final up = RunGacha()(
+        departure: line.stations[4],
+        line: line,
+        minStops: 2,
+        maxStops: 3,
+        direction: GachaDirection.up,
+      );
+      expect(up.direction, GachaDirection.down);
+      expect(up.stopsCount, inInclusiveRange(2, 3));
+      expect(up.arrivalStation, isNot(line.stations[4]));
+
+      // 起点(s0)からdownには進めない。
+      final down = RunGacha()(
+        departure: line.stations[0],
+        line: line,
+        minStops: 2,
+        maxStops: 3,
+        direction: GachaDirection.down,
+      );
+      expect(down.direction, GachaDirection.up);
+      expect(down.stopsCount, inInclusiveRange(2, 3));
+    });
+
     test('終点を超える駅数指定は終点駅でクリップされる', () {
       final result = RunGacha()(
         departure: line.stations[3],

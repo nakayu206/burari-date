@@ -20,6 +20,20 @@ class RailwayLine {
 
   Station get startTerminus => stations.first;
   Station get endTerminus => stations.last;
+
+  /// [departure]から実際に進める方面(up・down)。環状路線はどちらにも進める。
+  /// 非環状路線は、その方向に駅が残っている方面だけ(終端の駅では、先のない
+  /// 方面は進めない)。路線に含まれない駅のときは、判断できないので両方を返す。
+  Set<GachaDirection> reachableDirections(Station departure) {
+    final index = stations.indexWhere((s) => s.id == departure.id);
+    if (isCircular || index == -1) {
+      return {GachaDirection.up, GachaDirection.down};
+    }
+    return {
+      if (index < stations.length - 1) GachaDirection.up,
+      if (index > 0) GachaDirection.down,
+    };
+  }
 }
 
 /// S-02 の方面セレクタ(仕様書 4.2 S-02)
