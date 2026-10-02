@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../datasources/cloud/anonymous_auth.dart';
 import '../../domain/entities/ai_preference.dart';
 import '../../domain/entities/candidate.dart';
 import '../../domain/entities/station.dart';
@@ -13,10 +14,25 @@ typedef CandidatesCallable =
 /// (ホットペッパー/Foursquare)の実データをAIが要約した候補を取得する
 /// (Issue #3, #4)。
 class CandidateRepositoryImpl implements CandidateRepository {
-  CandidateRepositoryImpl({CandidatesCallable? callable})
-    : _callable = callable ?? _defaultCallable;
+  CandidateRepositoryImpl({
+    CandidatesCallable? callable,
+    Future<void> Function()? ensureSignedIn,
+  }) : _callable = callable ?? _defaultCallable,
+       // 注入した[callable](テスト)のときは、本物のFirebaseAuthには触れない。
+       _ensureSignedIn =
+           ensureSignedIn ??
+           (callable == null ? _defaultEnsureSignedIn : _noSignIn);
 
   final CandidatesCallable _callable;
+
+  /// 呼び出しの前に、ログインをやり直せるようにするための注入ポイント(Issue #105)。
+  final Future<void> Function() _ensureSignedIn;
+
+  static Future<void> _defaultEnsureSignedIn() async {
+    await AnonymousAuth.instance.ensureUid();
+  }
+
+  static Future<void> _noSignIn() async {}
 
   static Future<Map<String, dynamic>> _defaultCallable(
     Map<String, dynamic> data,
@@ -37,6 +53,15 @@ class CandidateRepositoryImpl implements CandidateRepository {
     final longitude = arrival.longitude;
     if (latitude == null || longitude == null) {
       throw const CandidateFetchException('到着駅の位置情報が取得できませんでした');
+    }
+
+    // 起動時のログインに失敗していても、ここでやり直す。
+    try {
+      await _ensureSignedIn();
+    } catch (_) {
+      throw const CandidateFetchException(
+        'サインインできませんでした。通信状況を確認して、もう一度お試しください',
+      );
     }
 
     Map<String, dynamic> data;

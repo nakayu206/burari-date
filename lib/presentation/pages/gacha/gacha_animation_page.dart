@@ -165,17 +165,22 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   }
 
   /// タップでスキップした場合、その場で確定状態まで進める(演出だけを省略し遷移は行わない)。演出が始まっていない間は何もしない。
-  void _skip() {
+  Future<void> _skip() async {
     if (!_started || _finished) return;
     _sequenceTimer?.cancel();
-    // 途中まで鳴っていたフリップ音を止め、決定音だけを鳴らす。
-    unawaited(_soundPlayer.stopAll());
+    final skipped = _result;
+    final stopping = _soundPlayer.stopAll();
     setState(() {
       _caption1 = '${_result.stopsCount}駅隣に決定!';
       _caption2 = '到着駅：${_result.arrivalStation.name}';
       _row2Active = true;
       _finished = true;
     });
+    // 途中まで鳴っていたフリップ音を止め終えてから、決定音だけを鳴らす。止める
+    // 処理が遅れると、鳴らしたばかりの決定音まで止めてしまうため。
+    await stopping;
+    // 待つ間に、画面を閉じた・もう一度ガチャを引いた場合は、鳴らさない。
+    if (!mounted || !identical(skipped, _result)) return;
     _play(GachaSound.decide);
   }
 
