@@ -80,4 +80,66 @@ void main() {
   test('規約の版は、1以上の番号', () {
     expect(kTermsVersion, greaterThanOrEqualTo(1));
   });
+
+  group('同意したあとの匿名ログイン(Issue #117)', () {
+    test('同意すると、同意を保存してから、匿名ログインする', () async {
+      var signInCount = 0;
+      final container = ProviderContainer(
+        overrides: [
+          signInAfterConsentProvider.overrideWithValue(() async {
+            signInCount++;
+            return 'uid';
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(consentProvider.future);
+      expect(signInCount, 0, reason: '同意の前はログインしない');
+
+      await container.read(consentProvider.notifier).accept();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(signInCount, 1);
+    });
+
+    test('ログインに失敗しても、同意は取り消さない', () async {
+      final container = ProviderContainer(
+        overrides: [
+          signInAfterConsentProvider.overrideWithValue(
+            () async => throw Exception('network'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(consentProvider.future);
+
+      await container.read(consentProvider.notifier).accept();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(consentProvider).value, isTrue);
+    });
+
+    test('同意の保存に失敗したときは、ログインしない', () async {
+      var signInCount = 0;
+      final container = ProviderContainer(
+        overrides: [
+          consentRepositoryProvider.overrideWithValue(_FailingSaveRepository()),
+          signInAfterConsentProvider.overrideWithValue(() async {
+            signInCount++;
+            return 'uid';
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(consentProvider.future);
+
+      await expectLater(
+        container.read(consentProvider.notifier).accept(),
+        throwsStateError,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(signInCount, 0);
+    });
+  });
 }
