@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
 import 'account_page.dart';
 import 'contact_page.dart';
+import 'purchase_page.dart';
 import 'ai_preference_page.dart';
 import 'sound_settings_page.dart';
 import 'terms_page.dart';
@@ -18,6 +19,7 @@ class SettingsPage extends StatelessWidget {
     ('効果音', (_) => const SoundSettingsPage()),
     ('好み設定', (_) => const AiPreferencePage()),
     ('アカウント', (_) => const AccountPage()),
+    ('プラン', (_) => const PurchasePage()),
     ('利用規約', (_) => const TermsPage()),
     ('お問い合わせ', (_) => const ContactPage()),
   ];
