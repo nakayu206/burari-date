@@ -33,8 +33,8 @@ const FROM_ADDRESS = "ぶらりデートガチャ <onboarding@resend.dev>";
 export interface Inquiry {
   category: InquiryCategory;
   message: string;
-  /** 返信が必要なときだけ入力された、返信先のメールアドレス */
-  replyTo?: string;
+  /** 返信先のメールアドレス(必須。匿名ログインのため、ほかに連絡の手段がない) */
+  replyTo: string;
 }
 
 /** 調査用に、メールに添える情報 */
@@ -67,14 +67,12 @@ export function parseInquiry(data: unknown): Inquiry {
     throw invalid(`本文は${MAX_MESSAGE_LENGTH}文字までです`);
   }
 
-  let replyTo: string | undefined;
-  if (d.replyTo !== undefined && d.replyTo !== null && d.replyTo !== "") {
-    if (typeof d.replyTo !== "string") throw invalid("返信先が不正です");
-    const trimmed = d.replyTo.trim();
-    if (trimmed.length > MAX_REPLY_TO_LENGTH || !EMAIL_PATTERN.test(trimmed)) {
-      throw invalid("返信先のメールアドレスが不正です");
-    }
-    replyTo = trimmed;
+  if (typeof d.replyTo !== "string" || d.replyTo.trim() === "") {
+    throw invalid("返信先のメールアドレスを入力してください");
+  }
+  const replyTo = d.replyTo.trim();
+  if (replyTo.length > MAX_REPLY_TO_LENGTH || !EMAIL_PATTERN.test(replyTo)) {
+    throw invalid("返信先のメールアドレスが不正です");
   }
 
   return { category: category as InquiryCategory, message, replyTo };
@@ -90,7 +88,7 @@ export function sanitizeMeta(value: unknown): string | undefined {
 
 /**
  * Resend(メール送信API)に渡す内容を作る。件名は固定の文言と種類だけで作り、
- * 利用者の入力は本文にだけ入れる(件名への注入を防ぐ)。返信先はReply-Toに設定する。
+ * 利用者の入力は本文にだけ入れる(件名への注入を防ぐ)。返信先(必須)はReply-Toに設定する。
  */
 export function buildResendPayload(
   inquiry: Inquiry,
@@ -100,7 +98,7 @@ export function buildResendPayload(
   const label = CATEGORY_LABELS[inquiry.category];
   const lines = [
     `種類: ${label}`,
-    `返信先: ${inquiry.replyTo ?? "(入力なし)"}`,
+    `返信先: ${inquiry.replyTo}`,
     "",
     inquiry.message,
     "",
@@ -114,7 +112,7 @@ export function buildResendPayload(
     to: [to],
     subject: `[ぶらりデートガチャ] ${label}のお問い合わせ`,
     text: lines.join("\n"),
-    ...(inquiry.replyTo ? { reply_to: inquiry.replyTo } : {}),
+    reply_to: inquiry.replyTo,
   };
 }
 
