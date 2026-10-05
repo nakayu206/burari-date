@@ -9,18 +9,15 @@ import '../../../core/config/gacha_flap_timing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
-import '../../../core/constants/app_train_colors.dart';
 import '../../../domain/entities/gacha_result.dart';
 import '../../../domain/entities/sound_settings.dart';
 import '../../../domain/services/sound_player.dart';
 import '../../providers/gacha_form_provider.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/sound_providers.dart';
+import '../../widgets/station_sign.dart';
 import '../../widgets/train_illustration.dart';
 import 'candidate_list_page.dart';
-
-/// 電車の正面イラスト(方向幕は自前のサインボードで上書きする)。assets/images/train_face.png を配置すること。
-const _kTrainFaceAsset = 'assets/images/train_face.png';
 
 // このファイルのアニメーション設計は、ユーザー提供の参考実装(gacha_split_flap_train_bg_sunny.html)をベースに、行(駅数/到着駅名)ごとに1枚のカードとして扱い、文字の見えない空フリップを数回行った後に行全体の文字列を1回のフリップで確定させる。
 
@@ -55,7 +52,7 @@ const _kCaptionShadows = [
   Shadow(color: _kCaptionOutlineColor, offset: Offset(1.5, 1.5)),
 ];
 
-/// S-03 ガチャ演出画面。晴天の空・電車が線路を走る背景の上に、発車標(スプリットフラップ)風のセルが1文字ずつ段差をつけてパタッと確定する。確定後は別画面へ自動遷移せず、この場で電車の正面イラストと「この駅に行く」「もう一度ガチャ」を表示する。
+/// S-03 ガチャ演出画面。晴天の空・電車が線路を走る背景の上に、発車標(スプリットフラップ)風のセルが1文字ずつ段差をつけてパタッと確定する。確定後は別画面へ自動遷移せず、この場で駅名標(到着駅 + 「この駅に行く」「もう一度ガチャ」の矢印)を表示する。
 class GachaAnimationPage extends ConsumerStatefulWidget {
   const GachaAnimationPage({super.key, required this.result});
 
@@ -281,7 +278,7 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   }
 }
 
-/// 確定後にその場で表示する結果カード。電車の正面イラスト(方向幕に駅情報を表示)+ アクションボタン。
+/// 確定後にその場で表示する結果カード。駅名標(到着駅 + 左右の矢印の操作)。
 class _ResultCard extends StatelessWidget {
   const _ResultCard({
     super.key,
@@ -296,102 +293,16 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 200),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _TrainFace(destination: result.arrivalStation.name),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '${result.stopsCount}駅隣',
-            style: const TextStyle(
-              color: _kCaptionColor,
-              fontSize: AppFontSizes.bodyLarge,
-              shadows: _kCaptionShadows,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          ElevatedButton(
-            onPressed: onViewCandidates,
-            child: const Text('この駅に行く'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          OutlinedButton(onPressed: onReroll, child: const Text('もう一度ガチャ')),
-        ],
-      ),
-    );
-  }
-}
-
-/// 電車の正面イラスト。train_face.png(クリーム×緑の旧型国電)の上に、行先サインだけ自前で重ねて表示する。
-class _TrainFace extends StatelessWidget {
-  const _TrainFace({required this.destination});
-
-  final String destination;
-
-  @override
-  Widget build(BuildContext context) {
-    // train_face.png は電車の輪郭ぴったりにクロップ済み(910×1116、透過背景)。画像内の方向幕の位置に、実際の到着駅名を表示する自前のサインボードを重ねる。透過画像なので、矩形の影は付けない。
-    return AspectRatio(
-      aspectRatio: 910 / 1116,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final height = constraints.maxHeight;
-          return Stack(
-            children: [
-              Image.asset(
-                _kTrainFaceAsset,
-                width: width,
-                height: height,
-                fit: BoxFit.cover,
-              ),
-              Positioned(
-                left: width * 0.182,
-                right: width * 0.182,
-                top: height * 0.074,
-                child: _SignBoard(
-                  text: '$destination行',
-                  fontSize: AppFontSizes.titleMedium,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SignBoard extends StatelessWidget {
-  const _SignBoard({required this.text, required this.fontSize});
-
-  final String text;
-  final double fontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppTrainColors.cream,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppTrainColors.outline, width: 1.5),
-      ),
-      alignment: Alignment.center,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          text,
-          style: GoogleFonts.mochiyPopOne(
-            color: AppTrainColors.green,
-            fontSize: fontSize,
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: StationSign(
+          stationName: result.arrivalStation.name,
+          lineName: result.line.name,
+          stopsCount: result.stopsCount,
+          onReroll: onReroll,
+          onViewCandidates: onViewCandidates,
         ),
       ),
     );
