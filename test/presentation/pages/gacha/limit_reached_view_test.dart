@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:burari_date/domain/repositories/candidate_repository.dart';
@@ -13,12 +14,15 @@ void main() {
     required LimitKind kind,
     required bool hasAccount,
   }) async {
+    // 行き先のアカウント画面が、Providerを使うため、ProviderScopeで包む。
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: LimitReachedView(
-            error: CandidateLimitException(backendMessage, kind: kind),
-            hasAccount: hasAccount,
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: LimitReachedView(
+              error: CandidateLimitException(backendMessage, kind: kind),
+              hasAccount: hasAccount,
+            ),
           ),
         ),
       ),
