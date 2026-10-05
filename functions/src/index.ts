@@ -8,3 +8,5 @@ export const ping = onRequest((req, res) => {
 });
 
 export { getCandidates } from "./candidates";
+
+export { sendInquiry } from "./sendInquiry";
