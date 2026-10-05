@@ -41,9 +41,20 @@ void main() {
         'Anthropic',
         'HeartRails',
         'OpenStreetMap',
+        'Resend',
       ]) {
         expect(privacy, contains(service), reason: '$service の記載がない');
       }
+    });
+
+    test('プライバシーポリシーには、お問い合わせで、メールアドレスを取得することを書く', () {
+      final privacy = all(privacySections);
+
+      expect(privacy, contains('返信先のメールアドレス'));
+      expect(privacy, contains('返信先のメールアドレスは、このためだけに使います'));
+      expect(privacy, contains('対応が終わってから1か月を目安に削除します'));
+      // メールアドレスは取得しない、という古い記載が残っていない。
+      expect(privacy, isNot(contains('現時点では取得しません')));
     });
 
     test('全ての条・項目に、見出しと本文がある', () {
