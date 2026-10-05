@@ -26,7 +26,7 @@ class HomePage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Column(
             children: [
-              const Spacer(flex: 3),
+              const Spacer(flex: 4),
               // タイトルの左上に「ぶらり」を斜めに添えて、アプリ名「ぶらり
               // デートガチャ」の由来を見せる小さなアクセントにする。
               Stack(
@@ -34,9 +34,12 @@ class HomePage extends StatelessWidget {
                 children: [
                   Text(
                     'デートガチャ',
-                    style: GoogleFonts.mochiyPopOne(
+                    // 電車・駅名標と同じ、ドット絵に合う書体にする。
+                    style: GoogleFonts.dotGothic16(
                       color: AppColors.primary,
                       fontSize: AppFontSizes.displayLarge,
+                      // ドット書体には太字がないため、擬似的な太字で、線を太くする。
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   Positioned(
@@ -46,9 +49,10 @@ class HomePage extends StatelessWidget {
                       angle: -0.3,
                       child: Text(
                         'ぶらり',
-                        style: GoogleFonts.mochiyPopOne(
+                        style: GoogleFonts.dotGothic16(
                           color: AppColors.secondary,
                           fontSize: AppFontSizes.bodyMedium,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -76,7 +80,7 @@ class HomePage extends StatelessWidget {
               // ず、横長など高さの狭い画面でオーバーフローしうる(CodeRabbit
               // 指摘)。
               const Expanded(flex: 5, child: _HomeIllustration()),
-              const Spacer(flex: 4),
+              const Spacer(flex: 3),
             ],
           ),
         ),
