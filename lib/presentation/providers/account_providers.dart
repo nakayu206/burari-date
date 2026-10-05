@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/repositories/placeholder_account_repository.dart';
+import '../../data/repositories/firebase_account_repository.dart';
 import '../../domain/entities/account_status.dart';
 import '../../domain/repositories/account_repository.dart';
 
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
-  return const PlaceholderAccountRepository();
+  return FirebaseAccountRepository();
 });
 
 /// アカウントの状態(ゲスト/登録済み)。登録・ログアウトに追従する。
