@@ -129,6 +129,8 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
           return LimitReachedView(
             error: error,
             hasAccount: ref.watch(hasAccountProvider),
+            // 購入して戻ったときと、購入の反映を待つときに、候補を取り直す。
+            onRetry: () => ref.invalidate(candidatesProvider(args)),
           );
         }
         // タブを保持するため、失敗したときはここから取り直せるようにする。
