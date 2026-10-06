@@ -3,38 +3,69 @@ import { test } from "node:test";
 
 import {
   addCategory,
+  applyCharge,
+  applyRefund,
+  isSubscriptionActive,
   isValidGachaId,
   LIFETIME_FREE_LIMIT,
+  MONTHLY_FAIR_USE_LIMIT,
+  monthKeyOf,
+  planCharge,
   planRelease,
-  planReservation,
+  planUsage,
+  readUserUsage,
   removeCategory,
+  type UserUsage,
 } from "./fairUse";
+
+const NOW = new Date("2026-10-15T03:00:00Z");
+
+/** 購読していない(無料枠だけの)ユーザーの利用状況 */
+const free = (used: number): UserUsage => ({
+  lifetimeFreeUsed: used,
+  isSubscriber: false,
+  monthlyUsed: 0,
+  extraCredits: 0,
+});
+
+/** 購読中のユーザーの利用状況 */
+const subscriber = (monthlyUsed: number, extraCredits = 0): UserUsage => ({
+  lifetimeFreeUsed: 0,
+  isSubscriber: true,
+  monthlyUsed,
+  extraCredits,
+});
+
+const limitTypeOf = (e: unknown) =>
+  (e as { details?: { limitType?: string } }).details?.limitType;
 
 test("無料上限は10回である", () => {
   assert.equal(LIFETIME_FREE_LIMIT, 10);
 });
 
-test("新しいガチャの最初の取得は、1回と数える", () => {
-  assert.deepEqual(planReservation(0, undefined, "gourmet"), { charge: true });
-  assert.deepEqual(planReservation(3, [], "sightseeing"), { charge: true });
+test("購読中の月の上限は30回である", () => {
+  assert.equal(MONTHLY_FAIR_USE_LIMIT, 30);
+});
+
+// ---- 無料枠(購読していないユーザー) ----
+
+test("新しいガチャの最初の取得は、1回と数える(無料枠)", () => {
+  assert.deepEqual(planUsage(free(0), undefined, "gourmet"), { source: "free" });
+  assert.deepEqual(planUsage(free(3), [], "sightseeing"), { source: "free" });
 });
 
 test("同じガチャの、もう一方のカテゴリは数えない(グルメ・観光で1回)", () => {
-  assert.deepEqual(planReservation(3, ["gourmet"], "sightseeing"), {
-    charge: false,
-  });
-  assert.deepEqual(planReservation(3, ["sightseeing"], "gourmet"), {
-    charge: false,
-  });
+  assert.deepEqual(planUsage(free(3), ["gourmet"], "sightseeing"), {});
+  assert.deepEqual(planUsage(free(3), ["sightseeing"], "gourmet"), {});
 });
 
 test("同じガチャの同じカテゴリを取り直すと、また1回と数える(gachaIdの使い回し対策)", () => {
-  assert.deepEqual(planReservation(3, ["gourmet"], "gourmet"), { charge: true });
+  assert.deepEqual(planUsage(free(3), ["gourmet"], "gourmet"), { source: "free" });
 });
 
 test("上限に達していると、新しいガチャの取得は拒否する", () => {
   assert.throws(
-    () => planReservation(LIFETIME_FREE_LIMIT, undefined, "gourmet"),
+    () => planUsage(free(LIFETIME_FREE_LIMIT), undefined, "gourmet"),
     (e: unknown) =>
       (e as { code?: string }).code === "resource-exhausted" &&
       String((e as Error).message).includes("無料利用の上限(10回)"),
@@ -43,29 +74,203 @@ test("上限に達していると、新しいガチャの取得は拒否する",
 
 test("上限のエラーは、種類(無料枠)を details に付けて返す", () => {
   assert.throws(
-    () => planReservation(LIFETIME_FREE_LIMIT, undefined, "gourmet"),
-    (e: unknown) =>
-      (e as { details?: { limitType?: string } }).details?.limitType ===
-      "free_tier",
+    () => planUsage(free(LIFETIME_FREE_LIMIT), undefined, "gourmet"),
+    (e: unknown) => limitTypeOf(e) === "free_tier",
   );
 });
 
 test("上限に達していても、数え済みのガチャの、もう一方のカテゴリは見られる", () => {
-  assert.deepEqual(planReservation(LIFETIME_FREE_LIMIT, ["gourmet"], "sightseeing"), {
-    charge: false,
-  });
-});
-
-test("上限に達していると、同じカテゴリの取り直しは拒否する", () => {
-  assert.throws(() =>
-    planReservation(LIFETIME_FREE_LIMIT, ["gourmet"], "gourmet"),
+  assert.deepEqual(
+    planUsage(free(LIFETIME_FREE_LIMIT), ["gourmet"], "sightseeing"),
+    {},
   );
 });
 
-test("gachaIdがない古いアプリは、呼び出しごとに数える", () => {
-  assert.deepEqual(planReservation(0, undefined, "gourmet"), { charge: true });
-  assert.deepEqual(planReservation(0, undefined, "sightseeing"), { charge: true });
+test("上限に達していると、同じカテゴリの取り直しは拒否する", () => {
+  assert.throws(() => planUsage(free(LIFETIME_FREE_LIMIT), ["gourmet"], "gourmet"));
 });
+
+test("gachaIdがない古いアプリは、呼び出しごとに数える", () => {
+  assert.deepEqual(planUsage(free(0), undefined, "gourmet"), { source: "free" });
+  assert.deepEqual(planUsage(free(0), undefined, "sightseeing"), { source: "free" });
+});
+
+// ---- 購読中(月のフェアユース上限・追加購入) ----
+
+test("購読中は、無料枠ではなく、月の回数から数える", () => {
+  assert.deepEqual(planCharge(subscriber(0)), { source: "monthly" });
+  assert.deepEqual(planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT - 1)), {
+    source: "monthly",
+  });
+});
+
+test("購読中は、無料枠を使い切っていても、月の上限の範囲で、使える", () => {
+  const usage: UserUsage = { ...subscriber(0), lifetimeFreeUsed: LIFETIME_FREE_LIMIT };
+  assert.deepEqual(planCharge(usage), { source: "monthly" });
+});
+
+test("月の上限に達したら、追加購入の回数があれば、それを使う", () => {
+  assert.deepEqual(planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT, 2)), {
+    source: "extra",
+  });
+});
+
+test("月の上限に達して、追加購入の回数もなければ、月の上限として拒否する", () => {
+  assert.throws(
+    () => planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT, 0)),
+    (e: unknown) =>
+      (e as { code?: string }).code === "resource-exhausted" &&
+      limitTypeOf(e) === "monthly" &&
+      String((e as Error).message).includes("今月の利用上限(30回)"),
+  );
+});
+
+test("月の上限に達していても、数え済みのガチャの、もう一方のカテゴリは見られる", () => {
+  assert.deepEqual(
+    planUsage(subscriber(MONTHLY_FAIR_USE_LIMIT), ["gourmet"], "sightseeing"),
+    {},
+  );
+});
+
+test("購読が切れたら、無料枠に戻り、使い切っていれば、無料枠の上限で拒否する(復活しない)", () => {
+  const lapsed: UserUsage = { ...free(LIFETIME_FREE_LIMIT), monthlyUsed: 5 };
+  assert.throws(
+    () => planCharge(lapsed),
+    (e: unknown) => limitTypeOf(e) === "free_tier",
+  );
+});
+
+// ---- 利用状況の読み取り ----
+
+test("月の区切りは、日本時間(UTCの15時に月が変わる)", () => {
+  assert.equal(monthKeyOf(new Date("2026-10-31T14:59:59Z")), "202610");
+  assert.equal(monthKeyOf(new Date("2026-10-31T15:00:00Z")), "202611");
+  assert.equal(monthKeyOf(new Date("2026-12-31T15:00:00Z")), "202701");
+});
+
+test("購読中の判断: activeで、期限が過ぎていなければ、購読中", () => {
+  const future = new Date(NOW.getTime() + 86400000);
+  const past = new Date(NOW.getTime() - 86400000);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: future }, NOW), true);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: past }, NOW), false);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "inactive", subscriptionExpiresAt: future }, NOW), false);
+  assert.equal(isSubscriptionActive({}, NOW), false);
+  assert.equal(isSubscriptionActive(undefined, NOW), false);
+});
+
+test("購読中の判断: 期限がなければ、状態だけで判断する", () => {
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active" }, NOW), true);
+});
+
+test("購読中の判断: FirestoreのTimestamp(toMillis)・ミリ秒も、期限として読める", () => {
+  const later = NOW.getTime() + 1000;
+  assert.equal(
+    isSubscriptionActive(
+      { subscriptionStatus: "active", subscriptionExpiresAt: { toMillis: () => later } },
+      NOW,
+    ),
+    true,
+  );
+  assert.equal(
+    isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: later }, NOW),
+    true,
+  );
+  assert.equal(
+    isSubscriptionActive(
+      { subscriptionStatus: "active", subscriptionExpiresAt: NOW.getTime() - 1 },
+      NOW,
+    ),
+    false,
+  );
+});
+
+test("利用状況の読み取り: 今月の回数は、月が変わっていれば0になる", () => {
+  const data = {
+    lifetimeFreeUsed: 4,
+    monthlyGachaCount: 17,
+    monthlyKey: "202609",
+    extraGachaCredits: 3,
+  };
+  const usage = readUserUsage(data, NOW);
+  assert.equal(usage.monthlyUsed, 0, "先月の回数は、持ち越さない");
+  assert.equal(usage.lifetimeFreeUsed, 4, "無料枠は、月ごとに回復しない");
+  assert.equal(usage.extraCredits, 3, "追加購入の回数は、月が変わっても残る");
+
+  assert.equal(readUserUsage({ ...data, monthlyKey: monthKeyOf(NOW) }, NOW).monthlyUsed, 17);
+});
+
+test("利用状況の読み取り: 値がない・おかしいときは0", () => {
+  assert.deepEqual(readUserUsage(undefined, NOW), {
+    lifetimeFreeUsed: 0,
+    isSubscriber: false,
+    monthlyUsed: 0,
+    extraCredits: 0,
+  });
+  const usage = readUserUsage(
+    { lifetimeFreeUsed: -3, monthlyGachaCount: "x", monthlyKey: monthKeyOf(NOW), extraGachaCredits: NaN },
+    NOW,
+  );
+  assert.equal(usage.lifetimeFreeUsed, 0);
+  assert.equal(usage.monthlyUsed, 0);
+  assert.equal(usage.extraCredits, 0);
+});
+
+// ---- 回数の加算・払い戻し ----
+
+test("消費: 出どころごとの回数を、1つ進める", () => {
+  assert.deepEqual(applyCharge("free", free(2), NOW), { lifetimeFreeUsed: 3 });
+  assert.deepEqual(applyCharge("monthly", subscriber(5), NOW), {
+    monthlyGachaCount: 6,
+    monthlyKey: "202610",
+  });
+  assert.deepEqual(applyCharge("extra", subscriber(30, 2), NOW), {
+    extraGachaCredits: 1,
+  });
+});
+
+test("消費: 月が変わった最初の1回は、今月の分として、1から数える", () => {
+  const usage = readUserUsage(
+    { subscriptionStatus: "active", monthlyGachaCount: 29, monthlyKey: "202609" },
+    NOW,
+  );
+  assert.deepEqual(applyCharge("monthly", usage, NOW), {
+    monthlyGachaCount: 1,
+    monthlyKey: "202610",
+  });
+});
+
+test("払い戻し: 消費したのと同じ種類の回数を、1つ戻す", () => {
+  assert.deepEqual(applyRefund("free", free(3), NOW), { lifetimeFreeUsed: 2 });
+  assert.deepEqual(applyRefund("monthly", subscriber(6), NOW), {
+    monthlyGachaCount: 5,
+    monthlyKey: "202610",
+  });
+  assert.deepEqual(applyRefund("extra", subscriber(30, 1), NOW), {
+    extraGachaCredits: 2,
+  });
+});
+
+test("払い戻し: 0より下にはしない", () => {
+  assert.deepEqual(applyRefund("free", free(0), NOW), { lifetimeFreeUsed: 0 });
+});
+
+test("払い戻し: 月をまたいだあとの失敗では、新しい月の回数は戻さない(何も書かない)", () => {
+  // 先月に消費した分の失敗。いまの月の回数は0なので、戻すものがない。
+  const usage = readUserUsage(
+    { subscriptionStatus: "active", monthlyGachaCount: 12, monthlyKey: "202609" },
+    NOW,
+  );
+  assert.deepEqual(applyRefund("monthly", usage, NOW), {});
+});
+
+test("消費して、同じ出どころで戻すと、元の回数に戻る", () => {
+  const before = subscriber(7, 0);
+  const charged = applyCharge("monthly", before, NOW);
+  const after: UserUsage = { ...before, monthlyUsed: charged.monthlyGachaCount as number };
+  assert.deepEqual(applyRefund("monthly", after, NOW).monthlyGachaCount, 7);
+});
+
+// ---- ガチャの記録 ----
 
 test("ガチャの記録にカテゴリを加える・外す", () => {
   assert.deepEqual(addCategory(undefined, "gourmet"), ["gourmet"]);
@@ -85,8 +290,8 @@ test("取得に失敗して記録から外したカテゴリは、取り直し�
   // グルメ(数える)→観光(数えない)。観光が失敗すると観光を外す。
   let recorded = addCategory(addCategory(undefined, "gourmet"), "sightseeing");
   recorded = removeCategory(recorded, "sightseeing");
-  // 観光の取り直しは、数え済みガチャの別カテゴリとして、無料のまま。
-  assert.deepEqual(planReservation(1, recorded, "sightseeing"), { charge: false });
+  // 観光の取り直しは、数え済みガチャの別カテゴリとして、数えない。
+  assert.deepEqual(planUsage(free(1), recorded, "sightseeing"), {});
 });
 
 test("枠を消費したグルメが失敗しても、観光が成功・取得中なら枠を戻さない", () => {
