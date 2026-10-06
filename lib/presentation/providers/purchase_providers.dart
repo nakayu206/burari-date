@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/repositories/placeholder_purchase_repository.dart';
+import '../../data/repositories/revenuecat_purchase_repository.dart';
 import '../../domain/entities/subscription.dart';
 import '../../domain/repositories/purchase_repository.dart';
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>((ref) {
-  return const PlaceholderPurchaseRepository();
+  return RevenueCatPurchaseRepository();
 });
 
 /// 購入できるプランの案内(価格など)。

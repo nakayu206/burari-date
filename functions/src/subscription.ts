@@ -19,7 +19,7 @@ export const revenueCatWebhookAuth = defineSecret("REVENUECAT_WEBHOOK_AUTH");
  * 購読中かどうかを決める、RevenueCatのEntitlement(権利)のID。RevenueCatの
  * ダッシュボードで、月額プランの商品を、この名前のEntitlementにつなぐ。
  */
-export const PREMIUM_ENTITLEMENT_ID = "premium";
+export const PREMIUM_ENTITLEMENT_ID = "burari_date_pro";
 
 /** 通知1回で、状態を取り直すユーザーの最大数(TRANSFERなどで、複数になる場合の上限) */
 const MAX_USERS_PER_EVENT = 5;
