@@ -27,6 +27,11 @@ abstract class PurchaseRepository {
   /// いまの購読の状態。
   Future<SubscriptionStatus> loadStatus();
 
+  /// 購読の状態を、ストアの最新に、取り直す(保存してある状態を使わない)。Google Playの
+  /// 「定期購入」で、解約・更新された、アプリの外の変更を、反映するために使う。
+  /// 失敗したときは[PurchaseException]を投げる。
+  Future<SubscriptionStatus> refreshStatus();
+
   /// 月額サブスクを購入する。購入後の状態を返す。取りやめたときは
   /// [PurchaseCancelledException]、失敗したときは[PurchaseException]を投げる。
   Future<SubscriptionStatus> purchase();

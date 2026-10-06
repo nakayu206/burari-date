@@ -24,6 +24,9 @@ class _FakePurchaseRepository implements PurchaseRepository {
   Future<SubscriptionStatus> loadStatus() async => status;
 
   @override
+  Future<SubscriptionStatus> refreshStatus() async => status;
+
+  @override
   Future<SubscriptionStatus> purchase() async =>
       status = const SubscriptionStatus.active();
 

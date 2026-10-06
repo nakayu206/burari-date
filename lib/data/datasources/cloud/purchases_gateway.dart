@@ -76,6 +76,10 @@ abstract class PurchasesGateway {
   /// いまの権利の状態。
   Future<EntitlementState> loadState();
 
+  /// 保存してある状態(SDKのキャッシュ)を捨てて、最新の権利の状態を、取り直す。
+  /// Google Playの「定期購入」で、解約・更新されたなど、アプリの外の変更を、反映する。
+  Future<EntitlementState> refreshState();
+
   /// 月額プランを購入する。購入後の権利の状態を返す。
   Future<EntitlementState> purchase();
 
@@ -136,6 +140,12 @@ class RevenueCatGateway implements PurchasesGateway {
 
   @override
   Future<EntitlementState> loadState() => _guard(() async {
+    return _stateOf(await Purchases.getCustomerInfo());
+  });
+
+  @override
+  Future<EntitlementState> refreshState() => _guard(() async {
+    await Purchases.invalidateCustomerInfoCache();
     return _stateOf(await Purchases.getCustomerInfo());
   });
 

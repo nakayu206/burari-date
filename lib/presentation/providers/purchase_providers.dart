@@ -23,6 +23,18 @@ class SubscriptionNotifier extends AsyncNotifier<SubscriptionStatus> {
     return ref.read(purchaseRepositoryProvider).loadStatus();
   }
 
+  /// 購読の状態を、ストアの最新に、取り直す。Google Playの「定期購入」で、解約・更新
+  /// されたあとの表示を、そろえるため。読み込み中の表示には戻さず、いまの表示のまま、
+  /// 静かに更新する。取り直しに失敗したときは、いまの表示を残す(エラーにしない)。
+  Future<void> refresh() async {
+    try {
+      final status = await ref.read(purchaseRepositoryProvider).refreshStatus();
+      state = AsyncData(status);
+    } catch (_) {
+      // いまの表示を残す。
+    }
+  }
+
   /// 購入する。購入後の状態を返す。
   Future<SubscriptionStatus> purchase() async {
     final status = await ref.read(purchaseRepositoryProvider).purchase();

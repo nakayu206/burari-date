@@ -43,6 +43,13 @@ class _FakeGateway implements PurchasesGateway {
   }
 
   @override
+  Future<EntitlementState> refreshState() async {
+    log.add('refreshState');
+    _maybeFail();
+    return state;
+  }
+
+  @override
   Future<EntitlementState> purchase() async {
     log.add('purchase');
     _maybeFail();
@@ -148,7 +155,7 @@ void main() {
       );
     });
 
-    test('購読中でも、解約済みなら、更新日は渡さない(更新と表示しない)', () async {
+    test('購読中でも、解約済みなら、更新日ではなく、終わる日を渡す(更新と表示しない)', () async {
       gateway.state = EntitlementState(
         isActive: true,
         expiresAt: DateTime(2026, 11, 5),
@@ -159,6 +166,7 @@ void main() {
 
       expect(status.isActive, isTrue);
       expect(status.renewsOn, isNull);
+      expect(status.endsOn, DateTime(2026, 11, 5));
     });
 
     test('UIDが変わったら(ログアウトなど)、次の操作で、新しいUIDにそろえる', () async {
@@ -181,6 +189,41 @@ void main() {
         throwsA(isA<PurchaseException>()),
       );
       expect(log, isEmpty);
+    });
+  });
+
+  group('最新への取り直し', () {
+    test('キャッシュを使わない取り直しで、解約後の状態(終わる日)を返す', () async {
+      gateway.state = EntitlementState(
+        isActive: true,
+        expiresAt: DateTime(2026, 11, 5),
+        willRenew: false,
+      );
+
+      final status = await newRepository().refreshStatus();
+
+      expect(status, SubscriptionStatus.active(endsOn: DateTime(2026, 11, 5)));
+      expect(log, ['prepare:uid-1', 'refreshState']);
+      expect(log, isNot(contains('loadState')));
+    });
+
+    test('課金の設定が済んでいない間は、SDKに触れず、購読していない状態', () async {
+      final unavailable = _FakeGateway(log, isAvailable: false);
+
+      expect(
+        await newRepository(unavailable).refreshStatus(),
+        const SubscriptionStatus.inactive(),
+      );
+      expect(log, isEmpty);
+    });
+
+    test('失敗したときは、利用者向けの文言の例外にする', () async {
+      gateway.failure = PurchaseFailureKind.network;
+
+      await expectLater(
+        newRepository().refreshStatus(),
+        throwsA(isA<PurchaseException>()),
+      );
     });
   });
 
@@ -273,6 +316,9 @@ class _ThrowingGateway implements PurchasesGateway {
 
   @override
   Future<EntitlementState> loadState() async => throw StateError('boom');
+
+  @override
+  Future<EntitlementState> refreshState() async => throw StateError('boom');
 
   @override
   Future<EntitlementState> purchase() async => throw StateError('boom');
