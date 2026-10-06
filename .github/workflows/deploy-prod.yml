@@ -34,6 +34,30 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # アップロード鍵で署名する(Issue #147)。鍵とパスワードは、GitHubのSecretsに置く:
+      #   ANDROID_KEYSTORE_BASE64 : 鍵のファイル(.jks)をbase64にした文字列
+      #   ANDROID_KEYSTORE_PASSWORD : 鍵のパスワード(ストアと鍵で、同じ)
+      #   ANDROID_KEY_ALIAS : 鍵の別名(upload)
+      # Secretsが未登録のときは、署名せず(デバッグ用の署名のまま)ビルドする。その場合、
+      # できたAABは、Google Playに、アップロードできない。
+      - name: Prepare upload key (if secrets exist)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::warning::署名用のSecretsが未登録です。デバッグ用の署名でビルドします(Google Playにはアップロードできません)。"
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          {
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyPassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=${ANDROID_KEY_ALIAS:-upload}"
+            echo "storeFile=$RUNNER_TEMP/upload-keystore.jks"
+          } > android/key.properties
+
       # prod flavor でビルド（Play ストア用は aab）
       - name: Build App Bundle (prod)
         run: flutter build appbundle --flavor prod -t lib/main_prod.dart --release
