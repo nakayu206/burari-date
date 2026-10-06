@@ -71,13 +71,13 @@ class RevenueCatPurchaseRepository implements PurchaseRepository {
     }
   }
 
-  /// 自動で更新されるときだけ、「次回の更新日」として、期限を渡す(解約済みで、期限で
-  /// 終わるときに、更新と表示しないため)。
+  /// 自動で更新されるときは、期限を「次回の更新日」として渡す。解約済みで、期限で終わる
+  /// ときは、「終わる日」として渡す(更新されないのに、更新と表示しないため)。
   static SubscriptionStatus _statusOf(EntitlementState state) {
     if (!state.isActive) return const SubscriptionStatus.inactive();
-    return SubscriptionStatus.active(
-      renewsOn: state.willRenew ? state.expiresAt : null,
-    );
+    return state.willRenew
+        ? SubscriptionStatus.active(renewsOn: state.expiresAt)
+        : SubscriptionStatus.active(endsOn: state.expiresAt);
   }
 
   @override
@@ -97,6 +97,15 @@ class RevenueCatPurchaseRepository implements PurchaseRepository {
     return _run(() async {
       await _prepare();
       return _statusOf(await _gateway.loadState());
+    });
+  }
+
+  @override
+  Future<SubscriptionStatus> refreshStatus() async {
+    if (!_gateway.isAvailable) return const SubscriptionStatus.inactive();
+    return _run(() async {
+      await _prepare();
+      return _statusOf(await _gateway.refreshState());
     });
   }
 
