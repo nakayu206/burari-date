@@ -6,4 +6,5 @@
 /// 「ウェブ SDK の構成」で確認できる。
 ///
 /// 空の間は、Googleでの登録を、「設定が、まだ済んでいません」と案内して使えなくする。
-const kGoogleServerClientId = '';
+const kGoogleServerClientId =
+    '889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com';
