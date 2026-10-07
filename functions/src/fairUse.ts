@@ -16,8 +16,7 @@ export const MONTHLY_FAIR_USE_LIMIT = 30;
 /**
  * 上限エラーの種類。
  * - `free_tier`: 無料枠(累計10回)を使い切った
- * - `monthly`: 購読中の、月のフェアユース上限(月30回目安)を超え、追加購入の
- *   回数も残っていない
+ * - `monthly`: 購読中の、月のフェアユース上限(月30回目安)を超えた(来月まで待つ)
  */
 export type LimitType = "free_tier" | "monthly";
 
@@ -26,9 +25,8 @@ export type LimitType = "free_tier" | "monthly";
  * ために、記録する。
  * - `free`: 無料枠(累計10回)
  * - `monthly`: 購読中の、月の回数
- * - `extra`: 追加購入の回数
  */
-export type UsageSource = "free" | "monthly" | "extra";
+export type UsageSource = "free" | "monthly";
 
 /** ガチャごとの取得記録を残す日数(TTLポリシーを設定したときに古い記録を消す目安) */
 const GACHA_USAGE_TTL_DAYS = 30;
@@ -62,8 +60,6 @@ export interface UserUsage {
   isSubscriber: boolean;
   /** 今月、使った回数(月が変わっていれば0) */
   monthlyUsed: number;
-  /** 追加購入の、残りの回数 */
-  extraCredits: number;
 }
 
 function countOf(value: unknown): number {
@@ -127,7 +123,6 @@ export function readUserUsage(
     ),
     isSubscriber: isSubscriptionActive(data, now),
     monthlyUsed: isSameMonth ? countOf(data?.monthlyGachaCount) : 0,
-    extraCredits: countOf(data?.extraGachaCredits),
   };
 }
 
@@ -143,19 +138,18 @@ export interface Reservation {
  * 新しいガチャ1回を、どの回数から消費するかを決める(Firestoreを使わない純粋な関数)。
  * 消費できる回数がなければ、HttpsErrorを投げる。
  *
- * - 購読中: 月のフェアユース上限の範囲では、月の回数。上限に達したら、追加購入の
- *   回数があれば、それを使う。なければ、月の上限として拒否する。
+ * - 購読中: 月のフェアユース上限の範囲では、月の回数。上限に達したら、月の上限として
+ *   拒否する(追加購入は、ない。来月になると、また使える)。
  * - 購読していない(解約・期限切れも含む): 無料枠(累計10回)。使い切っていたら
  *   拒否する。購読が切れても、無料枠は、復活しない。
  */
 export function planCharge(usage: UserUsage): { source: UsageSource } {
   if (usage.isSubscriber) {
     if (usage.monthlyUsed < MONTHLY_FAIR_USE_LIMIT) return { source: "monthly" };
-    if (usage.extraCredits > 0) return { source: "extra" };
     throw new HttpsError(
       "resource-exhausted",
-      `今月の利用上限(${MONTHLY_FAIR_USE_LIMIT}回)に達しました。追加でご利用の場合は、追加課金をご利用ください。`,
-      // アプリが、上限の種類に応じた案内(登録・課金・追加課金)を出し分けるため。
+      `今月の利用上限(${MONTHLY_FAIR_USE_LIMIT}回)に達しました。来月になると、また、ご利用いただけます。`,
+      // アプリが、上限の種類に応じた案内(登録・課金・来月まで待つ)を出し分けるため。
       { limitType: "monthly" satisfies LimitType },
     );
   }
@@ -163,7 +157,7 @@ export function planCharge(usage: UserUsage): { source: UsageSource } {
   throw new HttpsError(
     "resource-exhausted",
     `無料利用の上限(${LIFETIME_FREE_LIMIT}回)に達しました。継続利用にはアカウント登録と課金が必要です。`,
-    // アプリが、上限の種類に応じた案内(登録・課金・追加課金)を出し分けるため。
+    // アプリが、上限の種類に応じた案内(登録・課金・来月まで待つ)を出し分けるため。
     { limitType: "free_tier" satisfies LimitType },
   );
 }
@@ -207,8 +201,6 @@ export function applyCharge(
       return { lifetimeFreeUsed: usage.lifetimeFreeUsed + 1 };
     case "monthly":
       return { monthlyGachaCount: usage.monthlyUsed + 1, monthlyKey: monthKeyOf(now) };
-    case "extra":
-      return { extraGachaCredits: Math.max(0, usage.extraCredits - 1) };
   }
 }
 
@@ -231,8 +223,6 @@ export function applyRefund(
       return usage.monthlyUsed > 0
         ? { monthlyGachaCount: usage.monthlyUsed - 1, monthlyKey: monthKeyOf(now) }
         : {};
-    case "extra":
-      return { extraGachaCredits: usage.extraCredits + 1 };
   }
 }
 
@@ -276,7 +266,7 @@ export function planRelease(
  *
  * `gachaId`があれば、1回のガチャのグルメ・観光を1回と数える。ない(古い
  * バージョンのアプリ)ときは、従来どおり呼び出しごとに数える。
- * どの回数(無料枠・月の回数・追加購入)を使うかは、[planCharge]。
+ * どの回数(無料枠・月の回数)を使うかは、[planCharge]。
  *
  * `deviceId`があれば、無料枠は、端末ごとにも数える(ログアウトで
  * 無料枠が戻らないようにするため)。

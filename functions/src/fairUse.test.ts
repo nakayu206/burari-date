@@ -27,15 +27,13 @@ const free = (used: number): UserUsage => ({
   lifetimeFreeUsed: used,
   isSubscriber: false,
   monthlyUsed: 0,
-  extraCredits: 0,
 });
 
 /** 購読中のユーザーの利用状況 */
-const subscriber = (monthlyUsed: number, extraCredits = 0): UserUsage => ({
+const subscriber = (monthlyUsed: number): UserUsage => ({
   lifetimeFreeUsed: 0,
   isSubscriber: true,
   monthlyUsed,
-  extraCredits,
 });
 
 const limitTypeOf = (e: unknown) =>
@@ -97,7 +95,7 @@ test("gachaIdがない古いアプリは、呼び出しごとに数える", () =
   assert.deepEqual(planUsage(free(0), undefined, "sightseeing"), { source: "free" });
 });
 
-// ---- 購読中(月のフェアユース上限・追加購入) ----
+// ---- 購読中(月のフェアユース上限) ----
 
 test("購読中は、無料枠ではなく、月の回数から数える", () => {
   assert.deepEqual(planCharge(subscriber(0)), { source: "monthly" });
@@ -111,19 +109,15 @@ test("購読中は、無料枠を使い切っていても、月の上限の範�
   assert.deepEqual(planCharge(usage), { source: "monthly" });
 });
 
-test("月の上限に達したら、追加購入の回数があれば、それを使う", () => {
-  assert.deepEqual(planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT, 2)), {
-    source: "extra",
-  });
-});
-
-test("月の上限に達して、追加購入の回数もなければ、月の上限として拒否する", () => {
+test("月の上限に達したら、月の上限として拒否する(追加購入は、ない)", () => {
   assert.throws(
-    () => planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT, 0)),
+    () => planCharge(subscriber(MONTHLY_FAIR_USE_LIMIT)),
     (e: unknown) =>
       (e as { code?: string }).code === "resource-exhausted" &&
       limitTypeOf(e) === "monthly" &&
-      String((e as Error).message).includes("今月の利用上限(30回)"),
+      String((e as Error).message).includes("今月の利用上限(30回)") &&
+      String((e as Error).message).includes("来月") &&
+      !String((e as Error).message).includes("追加"),
   );
 });
 
@@ -203,12 +197,10 @@ test("利用状況の読み取り: 今月の回数は、月が変わっていれ
     lifetimeFreeUsed: 4,
     monthlyGachaCount: 17,
     monthlyKey: "202609",
-    extraGachaCredits: 3,
   };
   const usage = readUserUsage(data, NOW);
   assert.equal(usage.monthlyUsed, 0, "先月の回数は、持ち越さない");
   assert.equal(usage.lifetimeFreeUsed, 4, "無料枠は、月ごとに回復しない");
-  assert.equal(usage.extraCredits, 3, "追加購入の回数は、月が変わっても残る");
 
   assert.equal(readUserUsage({ ...data, monthlyKey: monthKeyOf(NOW) }, NOW).monthlyUsed, 17);
 });
@@ -218,15 +210,13 @@ test("利用状況の読み取り: 値がない・おかしいときは0", () =>
     lifetimeFreeUsed: 0,
     isSubscriber: false,
     monthlyUsed: 0,
-    extraCredits: 0,
   });
   const usage = readUserUsage(
-    { lifetimeFreeUsed: -3, monthlyGachaCount: "x", monthlyKey: monthKeyOf(NOW), extraGachaCredits: NaN },
+    { lifetimeFreeUsed: -3, monthlyGachaCount: "x", monthlyKey: monthKeyOf(NOW) },
     NOW,
   );
   assert.equal(usage.lifetimeFreeUsed, 0);
   assert.equal(usage.monthlyUsed, 0);
-  assert.equal(usage.extraCredits, 0);
 });
 
 // ---- 回数の加算・払い戻し ----
@@ -236,9 +226,6 @@ test("消費: 出どころごとの回数を、1つ進める", () => {
   assert.deepEqual(applyCharge("monthly", subscriber(5), NOW), {
     monthlyGachaCount: 6,
     monthlyKey: "202610",
-  });
-  assert.deepEqual(applyCharge("extra", subscriber(30, 2), NOW), {
-    extraGachaCredits: 1,
   });
 });
 
@@ -259,9 +246,6 @@ test("払い戻し: 消費したのと同じ種類の回数を、1つ戻す", ()
     monthlyGachaCount: 5,
     monthlyKey: "202610",
   });
-  assert.deepEqual(applyRefund("extra", subscriber(30, 1), NOW), {
-    extraGachaCredits: 2,
-  });
 });
 
 test("払い戻し: 0より下にはしない", () => {
@@ -278,7 +262,7 @@ test("払い戻し: 月をまたいだあとの失敗では、新しい月の回
 });
 
 test("消費して、同じ出どころで戻すと、元の回数に戻る", () => {
-  const before = subscriber(7, 0);
+  const before = subscriber(7);
   const charged = applyCharge("monthly", before, NOW);
   const after: UserUsage = { ...before, monthlyUsed: charged.monthlyGachaCount as number };
   assert.deepEqual(applyRefund("monthly", after, NOW).monthlyGachaCount, 7);
