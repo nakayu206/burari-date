@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  describeSync,
   interpretCustomerInfo,
   isAuthorized,
   isFirebaseUid,
@@ -243,4 +244,48 @@ test("保存済みより、新しい(同じ)時刻の取得なら、保存する
 
 test("保存済みより、古い時刻の取得では、上書きしない(順番が前後しても、新しい状態が残る)", () => {
   assert.equal(shouldApplySync(100, 99), false);
+});
+
+// ---- ログ ----
+
+test("ログには、ユーザーIDの先頭6文字と、購読の状態・期限・保存したかを、入れる", () => {
+  const log = describeSync("RENEWAL", [
+    {
+      uid: UID,
+      info: { status: "active", expiresAtMs: Date.parse("2026-11-15T03:00:00Z"), requestedAtMs: REQUESTED },
+      saved: true,
+    },
+  ]);
+  assert.equal(log.event, "RENEWAL");
+  assert.deepEqual(log.users, [
+    { user: `${UID.slice(0, 6)}…`, status: "active", expiresAt: "2026-11-15T03:00:00.000Z", saved: true },
+  ]);
+  assert.match(log.message, /1\/1人/);
+});
+
+test("ログに、ユーザーIDの全体や、個人情報を出さない", () => {
+  const log = describeSync("INITIAL_PURCHASE", [
+    { uid: UID, info: { status: "inactive", expiresAtMs: null, requestedAtMs: REQUESTED }, saved: true },
+  ]);
+  const text = JSON.stringify(log);
+  assert.equal(text.includes(UID), false, "UIDの全体が、ログに出ている");
+  assert.equal(log.users[0].expiresAt, null);
+});
+
+test("保存済みより古い取得で、上書きしなかったときは、保存していない、と分かる", () => {
+  const log = describeSync("RENEWAL", [
+    { uid: UID, info: { status: "active", expiresAtMs: null, requestedAtMs: 1 }, saved: false },
+  ]);
+  assert.equal(log.users[0].saved, false);
+  assert.match(log.message, /0\/1人/);
+});
+
+test("複数のユーザー(TRANSFERなど)でも、1行にまとめる", () => {
+  const other = "ZyXwVu9876543210ZyXwVu987654";
+  const log = describeSync("TRANSFER", [
+    { uid: UID, info: { status: "inactive", expiresAtMs: null, requestedAtMs: REQUESTED }, saved: true },
+    { uid: other, info: { status: "active", expiresAtMs: null, requestedAtMs: REQUESTED }, saved: false },
+  ]);
+  assert.equal(log.users.length, 2);
+  assert.match(log.message, /1\/2人/);
 });

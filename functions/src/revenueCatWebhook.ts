@@ -1,6 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 
 import {
+  describeSync,
   fetchSubscriptionInfo,
   isAuthorized,
   parseWebhookEvent,
@@ -47,10 +48,14 @@ export const revenueCatWebhook = onRequest(
     }
 
     try {
+      const results = [];
       for (const uid of event.uids) {
         const info = await fetchSubscriptionInfo(revenueCatApiKey.value(), uid);
-        await saveSubscription(uid, info);
+        const saved = await saveSubscription(uid, info);
+        results.push({ uid, info, saved });
       }
+      // 成功したときも、ログに残す(通知が届き、保存できたかを、確かめられるように)。
+      console.log(JSON.stringify(describeSync(event.type, results)));
       res.status(200).send("ok");
     } catch (e) {
       // 500を返し、RevenueCatに再送してもらう。
