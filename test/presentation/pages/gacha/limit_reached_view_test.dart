@@ -87,11 +87,14 @@ void main() {
     expect(find.textContaining('アカウント登録'), findsNothing);
   });
 
-  testWidgets('課金後の月の上限を超えたときは、追加課金へ案内する', (tester) async {
+  testWidgets('課金後の月の上限を超えたときは、来月まで待つ案内を出し、ボタンは出さない', (tester) async {
     await pump(tester, kind: LimitKind.monthly, hasAccount: true);
 
     expect(find.textContaining('今月の利用上限に達しました'), findsOneWidget);
-    expect(find.text('追加課金'), findsOneWidget);
+    expect(find.textContaining('来月'), findsOneWidget);
+    // 追加購入は、ない。
+    expect(find.textContaining('追加'), findsNothing);
+    expect(find.byType(ElevatedButton), findsNothing);
   });
 
   testWidgets('上限のときは「再読み込み」を出さない(押しても解消しないため)', (tester) async {
@@ -113,7 +116,6 @@ void main() {
       const cases = [
         (LimitKind.freeTier, false, 'アカウント登録と課金'),
         (LimitKind.freeTier, true, '課金する'),
-        (LimitKind.monthly, true, '追加課金'),
       ];
       for (final (kind, hasAccount, label) in cases) {
         await pump(tester, kind: kind, hasAccount: hasAccount);
@@ -190,7 +192,7 @@ void main() {
       expect(retryCount, 1);
     });
 
-    testWidgets('購読中で、月の上限のときは、反映待ちにしない(追加課金を案内する)', (tester) async {
+    testWidgets('購読中で、月の上限のときは、反映待ちにしない(来月まで待つ案内)', (tester) async {
       await pump(
         tester,
         kind: LimitKind.monthly,
@@ -199,7 +201,7 @@ void main() {
       );
 
       expect(find.textContaining('今月の利用上限に達しました'), findsOneWidget);
-      expect(find.text('追加課金'), findsOneWidget);
+      expect(find.textContaining('来月'), findsOneWidget);
       expect(find.text('もう一度読み込む'), findsNothing);
     });
   });

@@ -117,7 +117,7 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) {
         // 利用上限は、再読み込みしても解消しないため、取り直しではなく、状況に
-        // 応じた案内(登録・課金・追加課金)を出す。
+        // 応じた案内(登録・課金・来月まで待つ)を出す。
         if (error is CandidateLimitException) {
           return LimitReachedView(
             error: error,
