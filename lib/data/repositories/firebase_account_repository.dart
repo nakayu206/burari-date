@@ -3,8 +3,8 @@ import '../../domain/repositories/account_repository.dart';
 import '../datasources/cloud/account_auth.dart';
 import '../datasources/cloud/anonymous_auth.dart';
 
-/// 匿名アカウントを登録アカウントに変換する、本物の[AccountRepository]
-/// (Issue #130)。
+/// 匿名アカウントを登録アカウントに変換する(登録)・登録済みのアカウントに入る(ログイン)、
+/// 本物の[AccountRepository](Issue #130・#136)。
 ///
 /// 登録は、いまの匿名アカウントにGoogleの認証情報を紐づける。ユーザーIDが
 /// 変わらないので、履歴・お気に入り・無料枠の回数は、そのまま引き継がれる。
@@ -38,6 +38,24 @@ class FirebaseAccountRepository implements AccountRepository {
     } catch (e) {
       throw accountExceptionFrom(e);
     }
+    return _auth.currentStatus();
+  }
+
+  @override
+  Future<AccountStatus> signIn(LoginMethod method) async {
+    try {
+      switch (method) {
+        case LoginMethod.google:
+          await _auth.signInWithGoogle();
+      }
+    } catch (e) {
+      throw accountExceptionFrom(e);
+    }
+    // ログインで、別のアカウントに切り替わった。次の操作の前に、ログインが、切れて
+    // いないことを確かめる(通常は、すでに、ログイン済み)。
+    try {
+      await _ensureSignedIn();
+    } catch (_) {}
     return _auth.currentStatus();
   }
 

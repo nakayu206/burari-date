@@ -19,15 +19,30 @@ class AccountCancelledException extends AccountException {
   const AccountCancelledException() : super('キャンセルしました');
 }
 
-/// アカウントの状態の取得・登録・ログアウト(Issue #129・#130)。
+/// 登録しようとしたGoogleアカウントが、すでに別のアカウントとして、登録済みであること
+/// を表す例外(Issue #136)。画面は、「ログイン」から入るよう、案内する。
+class AccountAlreadyRegisteredException extends AccountException {
+  const AccountAlreadyRegisteredException()
+    : super('このGoogleアカウントは、すでに登録されています。「Googleでログイン」から、入ってください。');
+}
+
+/// アカウントの状態の取得・登録・ログイン・ログアウト(Issue #129・#130・#136)。
 abstract class AccountRepository {
   /// いまのアカウントの状態。
   Future<AccountStatus> loadStatus();
 
   /// [method]でアカウントを登録する。匿名のアカウントを、登録済みのアカウントに
   /// 変換し、履歴・お気に入りは引き継ぐ。取りやめたときは
-  /// [AccountCancelledException]、失敗したときは[AccountException]を投げる。
+  /// [AccountCancelledException]、すでに登録済みの[method]のアカウントなら
+  /// [AccountAlreadyRegisteredException]、失敗したときは[AccountException]を投げる。
   Future<AccountStatus> register(LoginMethod method);
+
+  /// [method]のアカウントに、ログインする(Issue #136)。すでに登録済みのアカウントなら、
+  /// そのアカウントに切り替わり、以前の履歴・お気に入り・購読が戻る。**いまのゲストの
+  /// 履歴・お気に入りは、引き継がず、使えなくなる**(統合しない)。まだ登録されていない
+  /// アカウントなら、そのアカウントが、新しく作られる。取りやめたときは
+  /// [AccountCancelledException]、失敗したときは[AccountException]を投げる。
+  Future<AccountStatus> signIn(LoginMethod method);
 
   /// ログアウトする。ログアウト後の状態を返す。失敗したときは[AccountException]を
   /// 投げる。

@@ -14,6 +14,7 @@ class _FakeAccountAuth implements AccountAuth {
   final List<String> log;
   AccountStatus status = const AccountStatus.guest();
   Object? linkError;
+  Object? signInError;
   Object? signOutError;
 
   @override
@@ -26,6 +27,16 @@ class _FakeAccountAuth implements AccountAuth {
     status = const AccountStatus.registered(
       method: LoginMethod.google,
       email: 'user@example.com',
+    );
+  }
+
+  @override
+  Future<void> signInWithGoogle() async {
+    log.add('signIn');
+    if (signInError != null) throw signInError!;
+    status = const AccountStatus.registered(
+      method: LoginMethod.google,
+      email: 'existing@example.com',
     );
   }
 
@@ -101,16 +112,16 @@ void main() {
       );
     });
 
-    test('すでに登録されているGoogleアカウントは、その旨を知らせ、切り替えない', () async {
+    test('すでに登録されているGoogleアカウントは、「ログイン」から入るよう案内し、切り替えない', () async {
       auth.linkError = FirebaseAuthException(code: 'credential-already-in-use');
 
       await expectLater(
         newRepository().register(LoginMethod.google),
         throwsA(
-          isA<AccountException>().having(
+          isA<AccountAlreadyRegisteredException>().having(
             (e) => e.message,
             'message',
-            contains('すでに登録されています'),
+            allOf(contains('すでに登録されています'), contains('ログイン')),
           ),
         ),
       );
@@ -145,6 +156,71 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('signIn(ログイン)', () {
+    test('Googleでログインして、ログイン後の状態を返す(紐づけは、しない)', () async {
+      final status = await newRepository().signIn(LoginMethod.google);
+
+      expect(
+        status,
+        const AccountStatus.registered(
+          method: LoginMethod.google,
+          email: 'existing@example.com',
+        ),
+      );
+      expect(log, contains('signIn'));
+      expect(log, isNot(contains('link')), reason: '登録(紐づけ)とは、別の処理');
+    });
+
+    test('利用者が取りやめたときは、取りやめの例外にする', () async {
+      auth.signInError = const GoogleSignInException(
+        code: GoogleSignInExceptionCode.canceled,
+      );
+
+      await expectLater(
+        newRepository().signIn(LoginMethod.google),
+        throwsA(isA<AccountCancelledException>()),
+      );
+    });
+
+    test('通信の失敗は、通信を確かめるよう案内する', () async {
+      auth.signInError = FirebaseAuthException(code: 'network-request-failed');
+
+      await expectLater(
+        newRepository().signIn(LoginMethod.google),
+        throwsA(
+          isA<AccountException>().having(
+            (e) => e.message,
+            'message',
+            contains('通信'),
+          ),
+        ),
+      );
+    });
+
+    test('想定外のエラーは、内部の表記を出さず、決まった文言にする', () async {
+      auth.signInError = StateError('boom');
+
+      await expectLater(
+        newRepository().signIn(LoginMethod.google),
+        throwsA(
+          isA<AccountException>().having(
+            (e) => e.message,
+            'message',
+            isNot(contains('boom')),
+          ),
+        ),
+      );
+    });
+
+    test('ログインのあとの、サインインの確認に失敗しても、ログインは成功にする', () async {
+      ensureSignedInError = Exception('network');
+
+      final status = await newRepository().signIn(LoginMethod.google);
+
+      expect(status.isRegistered, isTrue);
     });
   });
 
