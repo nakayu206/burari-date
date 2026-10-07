@@ -132,6 +132,10 @@ export interface Reservation {
   charged: boolean;
   /** 消費した回数の出どころ(消費していないときはundefined) */
   source?: UsageSource;
+  /** 取得済みのカテゴリの取り直しで、追加で消費したか(失敗したら、その1回だけを戻す) */
+  isRefetch: boolean;
+  /** 枠を確保した月(日本時間のYYYYMM)。月をまたいで失敗したときに、戻す月を照合する */
+  monthKey: string;
 }
 
 /**
@@ -226,6 +230,22 @@ export function applyRefund(
   }
 }
 
+/**
+ * 消費した回数を戻してよいか(Firestoreを使わない純粋な関数)。月の回数は、消費した月と、
+ * ユーザーが持つ月の回数の月(`monthlyKey`)が、同じときだけ戻す。月をまたいで失敗したとき、
+ * 先月の分を戻すと、その間に成功した、今月の回数を減らしてしまうため。消費した月の記録が
+ * ない(古い記録)ときは、戻す。月に関係しない回数(無料枠)は、いつでも戻す。
+ */
+export function isRefundableMonth(
+  source: UsageSource,
+  userMonthlyKey: string | undefined,
+  chargedMonthKey: string | undefined,
+): boolean {
+  if (source !== "monthly") return true;
+  if (chargedMonthKey === undefined) return true;
+  return userMonthlyKey === chargedMonthKey;
+}
+
 /** ガチャの記録にカテゴリを加える(重複しない) */
 export function addCategory(recorded: string[] | undefined, category: string): string[] {
   const list = recorded ?? [];
@@ -245,15 +265,24 @@ export function removeCategory(recorded: string[] | undefined, category: string)
  * 枠を戻さず、ガチャの記録に残す。全てのカテゴリが失敗して記録が空になったときに、
  * そのガチャで消費した枠を戻す。
  *
+ * 取得済みのカテゴリの取り直し(`isRefetch`)は、ガチャの最初の消費とは別に、追加で
+ * 1回消費している。その取り直しが失敗したら、追加で消費した1回だけを戻す。ガチャの
+ * 記録(取得済みのカテゴリ)は、消さない。
+ *
  * - `reservationCharged`: 今回の呼び出しで回数を消費したか。
  * - `gachaCharged`: ガチャの記録が、回数を消費済みか(記録がなければundefined)。
+ * - `isRefetch`: 今回の消費が、取得済みのカテゴリの取り直しによる、追加の消費か。
  */
 export function planRelease(
   reservationCharged: boolean,
   gachaCharged: boolean | undefined,
   recorded: string[] | undefined,
   category: string,
+  isRefetch = false,
 ): { refund: boolean; remaining: string[] } {
+  if (isRefetch && reservationCharged) {
+    return { refund: true, remaining: recorded ?? [] };
+  }
   const remaining = removeCategory(recorded, category);
   if (remaining.length > 0) return { refund: false, remaining };
   return { refund: reservationCharged || gachaCharged === true, remaining };
@@ -313,18 +342,33 @@ export async function reserveUsage(
       const alreadyCharged = gachaSnap?.exists
         ? (gachaSnap.data()?.charged ?? true)
         : false;
-      // 回数の出どころは、最初に消費したときのものを引き継ぐ。
-      const chargedSource =
-        source ?? (gachaSnap?.data()?.chargedSource as UsageSource | undefined);
+      // 回数の出どころと、消費した月は、ガチャで最初に消費したときのものを引き継ぐ
+      // (取り直しで、追加で消費した分は、その呼び出しの[Reservation]が持つ)。
+      const existing = gachaSnap?.data();
+      const chargedSource = alreadyCharged
+        ? (existing?.chargedSource as UsageSource | undefined)
+        : source;
+      const chargedMonthKey = alreadyCharged
+        ? (existing?.chargedMonthKey as string | undefined)
+        : source
+          ? monthKeyOf(now)
+          : undefined;
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
         charged: alreadyCharged || source !== undefined,
         ...(chargedSource ? { chargedSource } : {}),
+        ...(chargedMonthKey ? { chargedMonthKey } : {}),
         updatedAt: now,
         expiresAt: new Date(now.getTime() + GACHA_USAGE_TTL_DAYS * 24 * 60 * 60 * 1000),
       });
     }
-    return { charged: source !== undefined, source };
+    return {
+      charged: source !== undefined,
+      source,
+      // 取得済みのカテゴリの取り直しで、追加で消費したか。
+      isRefetch: source !== undefined && recorded?.includes(category) === true,
+      monthKey: monthKeyOf(now),
+    };
   });
 }
 
@@ -364,6 +408,7 @@ export async function releaseUsage(
       gachaCharged,
       recorded,
       category,
+      reservation.isRefetch,
     );
 
     if (refund) {
@@ -372,8 +417,19 @@ export async function releaseUsage(
         reservation.source ??
         (gachaSnap?.data()?.chargedSource as UsageSource | undefined) ??
         "free";
+      // 戻す回数を、消費した月。今回の呼び出しが消費したなら、その月。そうでなければ、
+      // ガチャの記録が持つ、最初に消費した月。
+      const chargedMonthKey = reservation.charged
+        ? reservation.monthKey
+        : (gachaSnap?.data()?.chargedMonthKey as string | undefined);
       const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
-      const refundFields = applyRefund(source, usage, now);
+      const refundFields = isRefundableMonth(
+        source,
+        userSnap.data()?.monthlyKey as string | undefined,
+        chargedMonthKey,
+      )
+        ? applyRefund(source, usage, now)
+        : {};
       if (Object.keys(refundFields).length > 0) {
         tx.set(userRef, { ...refundFields, updatedAt: now }, { merge: true });
       }

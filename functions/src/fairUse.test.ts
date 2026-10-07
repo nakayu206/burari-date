@@ -5,6 +5,7 @@ import {
   addCategory,
   applyCharge,
   applyRefund,
+  isRefundableMonth,
   isSubscriptionActive,
   isValidDeviceId,
   SUBSCRIPTION_GRACE_MS,
@@ -318,6 +319,42 @@ test("1つだけ取得して失敗したときは、消費した枠を戻す", (
 test("gachaIdなし(記録なし)では、今回数えた分だけを戻す", () => {
   assert.equal(planRelease(true, undefined, undefined, "gourmet").refund, true);
   assert.equal(planRelease(false, undefined, undefined, "gourmet").refund, false);
+});
+
+test("取得済みのカテゴリの取り直しが失敗したら、追加で消費した1回を戻し、カテゴリの記録は残す", () => {
+  // グルメ・観光を取得済みで、グルメを取り直して(追加で1回消費)失敗した。
+  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true);
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"], "取得済みのカテゴリは、消さない");
+});
+
+test("取り直しの失敗で戻すのは、追加の1回だけ(ガチャの最初の消費は、戻さない)", () => {
+  // 取り直しが失敗しても、記録は残るので、そのあとで、もう一方の取り直しが失敗しても、
+  // 最初の消費は、全カテゴリが失敗するまで、戻らない。
+  const first = planRelease(true, true, ["gourmet"], "gourmet", true);
+  assert.equal(first.refund, true);
+  assert.deepEqual(first.remaining, ["gourmet"]);
+});
+
+test("ガチャの最初の消費(取り直しではない)は、これまでどおり", () => {
+  assert.equal(planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", false).refund, false);
+  assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false).refund, true);
+});
+
+test("消費していない呼び出しは、取り直し扱いにしない", () => {
+  // 別カテゴリで、消費しなかった呼び出し(isRefetchはfalse)。
+  assert.equal(planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing", false).refund, false);
+});
+
+test("月の回数は、消費した月と、いまの月の回数の月が同じときだけ、戻す(月またぎ)", () => {
+  // 先月(202609)に消費して、今月(202610)に別のガチャが成功した後で失敗した。
+  assert.equal(isRefundableMonth("monthly", "202610", "202609"), false);
+  assert.equal(isRefundableMonth("monthly", "202609", "202609"), true);
+});
+
+test("消費した月の記録がない(古い記録)ときは、戻す。無料枠は、月に関係なく、戻す", () => {
+  assert.equal(isRefundableMonth("monthly", "202610", undefined), true);
+  assert.equal(isRefundableMonth("free", "202610", "202609"), true);
 });
 
 test("gachaIdの形式を検証する(英数字・_・-のみ、64文字まで)", () => {
