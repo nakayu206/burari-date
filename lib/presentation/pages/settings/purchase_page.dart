@@ -12,7 +12,6 @@ import '../../../domain/repositories/purchase_repository.dart';
 import '../../providers/account_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/purchase_providers.dart';
-import '../../widgets/auth_section.dart';
 import '../../widgets/login_confirm_dialog.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
@@ -413,17 +412,17 @@ class _RegisterAndPurchaseBody extends StatelessWidget {
   final bool isBusy;
   final VoidCallback onPressed;
 
-  /// 登録済みの方の、ログイン(登録して購入する、とは、別のまとまり)。
+  /// 登録済みの方の、ログイン(登録して購入する、とは、別のボタン)。
   final VoidCallback onSignIn;
 
   @override
   Widget build(BuildContext context) {
+    // プラン画面は、スクロールなしの、1画面に収まるよう、コンパクトにする。購入が主役で、
+    // 登録済みの方の、ログインは、その下に、小さく置く(アカウント画面は、見出しで、
+    // 2つのまとまりに分けている)。
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 登録と、ログインは、別のまとまりにして、間を、大きくあける(押し間違い・
-        // 意味の混同を防ぐ)。
-        const AuthSectionHeading('はじめての方'),
         const _BodyText(
           'ご購入には、アカウントの登録が必要です。'
           '登録すると、いまの履歴とお気に入りを、そのまま引き継げます。',
@@ -439,16 +438,10 @@ class _RegisterAndPurchaseBody extends StatelessWidget {
                 )
               : Text('${LoginMethod.google.label}で登録して購入する'),
         ),
-        const OrDivider(),
-        const AuthSectionHeading('すでに登録済みの方'),
-        const _BodyText(
-          'ログインすると、以前の履歴・お気に入り・購読が、戻ります。\n'
-          'いまのゲストの履歴とお気に入りは、引き継がれません。',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
+        const SizedBox(height: AppSpacing.sm),
+        TextButton(
           onPressed: isBusy ? null : onSignIn,
-          child: Text('${LoginMethod.google.label}でログイン'),
+          child: Text('登録済みの方は、${LoginMethod.google.label}でログイン'),
         ),
       ],
     );

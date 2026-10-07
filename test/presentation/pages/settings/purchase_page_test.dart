@@ -112,9 +112,11 @@ void main() {
     bool hasAccount = true,
     SubscriptionUrlLauncher? launcher,
     _FakeAccountRepository? accountRepository,
+    Size size = const Size(1170, 2532),
+    double pixelRatio = 1.0,
   }) async {
-    tester.view.physicalSize = const Size(1170, 2532);
-    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = pixelRatio;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
@@ -666,25 +668,35 @@ void main() {
   });
 
   group('アカウント未登録: 登録済みの方の、ログイン(Issue #153)', () {
-    Finder signInLink() => find.widgetWithText(OutlinedButton, 'Googleでログイン');
+    Finder signInLink() => find.text('登録済みの方は、Googleでログイン');
 
-    testWidgets('「登録して購入する」とは、別のまとまり(見出しと「または」の線で分ける)に、ログインを出す', (
-      tester,
-    ) async {
+    testWidgets('「登録して購入する」の下に、小さく、登録済みの方の、ログインの入口を出す', (tester) async {
       await pumpPage(tester, _FakePurchaseRepository(), hasAccount: false);
 
-      expect(find.text('はじめての方'), findsOneWidget);
-      expect(find.text('すでに登録済みの方'), findsOneWidget);
-      expect(find.text('または'), findsOneWidget);
       expect(find.text('Googleで登録して購入する'), findsOneWidget);
       expect(signInLink(), findsOneWidget);
-
-      // 登録して購入するボタンと、ログインのボタンは、十分に、離れている。
+      // プラン画面は、コンパクトに(見出し・「または」の線は、アカウント画面だけ)。
+      expect(find.text('または'), findsNothing);
+      // 登録して購入するボタンの下に、ログインの入口がある。
       final register = tester.getRect(
         find.widgetWithText(ElevatedButton, 'Googleで登録して購入する'),
       );
-      final signIn = tester.getRect(signInLink());
-      expect(signIn.top - register.bottom, greaterThanOrEqualTo(80));
+      expect(tester.getRect(signInLink()).top, greaterThan(register.bottom));
+    });
+
+    testWidgets('未登録のときも、スクロールなしの、1画面に収まる(Pixel 8a)', (tester) async {
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository(),
+        hasAccount: false,
+        size: const Size(1080, 2400),
+        pixelRatio: 2.625,
+      );
+
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      expect(position.maxScrollExtent, 0);
     });
 
     testWidgets('押すと、先に、確認を出す(ゲストの履歴が使えなくなる旨)。やめるなら、ログインしない', (tester) async {
