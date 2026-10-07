@@ -39,6 +39,22 @@ class _FakeAccountRepository implements AccountRepository {
     );
   }
 
+  /// ログインの呼び出し。
+  final signedIn = <LoginMethod>[];
+  Object? signInError;
+  Completer<void>? signInGate;
+
+  @override
+  Future<AccountStatus> signIn(LoginMethod method) async {
+    signedIn.add(method);
+    await signInGate?.future;
+    if (signInError != null) throw signInError!;
+    return status = AccountStatus.registered(
+      method: method,
+      email: 'existing@example.com',
+    );
+  }
+
   @override
   Future<AccountStatus> signOut() async {
     signOutCount++;

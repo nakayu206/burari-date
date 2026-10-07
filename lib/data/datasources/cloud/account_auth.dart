@@ -16,6 +16,10 @@ abstract class AccountAuth {
   /// Googleでログインし、いまの(匿名の)アカウントに紐づけて、登録済みにする。
   Future<void> linkWithGoogle();
 
+  /// Googleでログインし、そのGoogleアカウントのアカウントに切り替える(Issue #136)。
+  /// いまの(匿名の)アカウントは、使われなくなる。
+  Future<void> signInWithGoogle();
+
   /// ログアウトする。
   Future<void> signOut();
 }
@@ -47,11 +51,9 @@ AccountException accountExceptionFrom(Object error) {
       case 'credential-already-in-use':
       case 'email-already-in-use':
       case 'account-exists-with-different-credential':
-        // 別の端末などで、すでに登録されているGoogleアカウント。匿名のまま使っていた
-        // 履歴を、どうするかが決まるまで、切り替えはしない(Issue #130)。
-        return const AccountException(
-          'このGoogleアカウントは、すでに登録されています。別のGoogleアカウントでお試しください。',
-        );
+        // 別の端末などで、すでに登録されているGoogleアカウント。登録(紐づけ)では
+        // 切り替えず、「ログイン」から入るよう、案内する(Issue #136)。
+        return const AccountAlreadyRegisteredException();
       case 'provider-already-linked':
         return const AccountException('すでにGoogleで登録済みです。');
       case 'network-request-failed':
@@ -121,6 +123,23 @@ class FirebaseAccountAuth implements AccountAuth {
     );
     // 紐づけの結果(プロバイダの情報)を、いまのユーザーに反映する。
     await user.reload();
+  }
+
+  @override
+  Future<void> signInWithGoogle() async {
+    if (serverClientId.isEmpty) {
+      throw const AccountException('Googleでのログインの設定が、まだ済んでいません。');
+    }
+    await _ensureInitialized();
+    final account = await GoogleSignIn.instance.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw const AccountException('Googleのログイン情報を取得できませんでした。');
+    }
+    // いまのゲストではなく、そのGoogleアカウントのアカウントに、切り替わる。
+    await FirebaseAuth.instance.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: idToken),
+    );
   }
 
   @override
