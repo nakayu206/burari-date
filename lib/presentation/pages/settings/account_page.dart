@@ -8,6 +8,8 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/account_status.dart';
 import '../../../domain/repositories/account_repository.dart';
 import '../../providers/account_providers.dart';
+import '../../widgets/auth_section.dart';
+import '../../widgets/login_confirm_dialog.dart';
 
 /// アカウント画面(Issue #129)。
 ///
@@ -29,6 +31,19 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     await _run(
       errorTitle: 'アカウントを登録できませんでした',
       action: () => ref.read(accountStatusProvider.notifier).register(method),
+    );
+  }
+
+  /// 「Googleでログイン」(Issue #152)。確認のあとに、Googleのアカウントを選んで、そのアカウント
+  /// に切り替える。いまのゲストの履歴・お気に入りは、使えなくなる(登録済みのアカウントなら、
+  /// 以前の履歴・お気に入り・購読が戻る)。
+  Future<void> _signIn(LoginMethod method) async {
+    if (_isBusy) return;
+    final confirmed = await showLoginConfirmDialog(context);
+    if (!confirmed || !mounted) return;
+    await _run(
+      errorTitle: 'ログインできませんでした',
+      action: () => ref.read(accountStatusProvider.notifier).signIn(method),
     );
   }
 
@@ -113,7 +128,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
               if (account.isRegistered)
                 _RegisteredBody(isBusy: _isBusy, onSignOut: _signOut)
               else
-                _GuestBody(isBusy: _isBusy, onRegister: _register),
+                _GuestBody(
+                  isBusy: _isBusy,
+                  onRegister: _register,
+                  onSignIn: _signIn,
+                ),
             ],
           ),
         ),
@@ -181,21 +200,31 @@ class _Header extends StatelessWidget {
 
 /// ゲストのときの、登録の案内とボタン。
 class _GuestBody extends StatelessWidget {
-  const _GuestBody({required this.isBusy, required this.onRegister});
+  const _GuestBody({
+    required this.isBusy,
+    required this.onRegister,
+    required this.onSignIn,
+  });
 
   final bool isBusy;
   final void Function(LoginMethod method) onRegister;
+
+  /// 登録済みの方の、ログイン(登録とは、別のまとまり)。
+  final void Function(LoginMethod method) onSignIn;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 登録と、ログインは、別のまとまりにして、間を、大きくあける(押し間違い・
+        // 意味の混同を防ぐ)。
+        const AuthSectionHeading('はじめての方'),
         const _BodyText(
           'アカウントを登録すると、いまの履歴とお気に入りを、そのまま引き継げます。\n'
           '無料で使える回数を使い切ったあとは、アカウントの登録と課金が必要です。',
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
         for (final method in LoginMethod.values)
           ElevatedButton(
             onPressed: isBusy ? null : () => onRegister(method),
@@ -206,6 +235,18 @@ class _GuestBody extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Text('${method.label}で登録する'),
+          ),
+        const OrDivider(),
+        const AuthSectionHeading('すでに登録済みの方'),
+        const _BodyText(
+          'ログインすると、以前の履歴・お気に入り・購読が、戻ります。\n'
+          'いまのゲストの履歴とお気に入りは、引き継がれません。',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        for (final method in LoginMethod.values)
+          OutlinedButton(
+            onPressed: isBusy ? null : () => onSignIn(method),
+            child: Text('${method.label}でログイン'),
           ),
       ],
     );

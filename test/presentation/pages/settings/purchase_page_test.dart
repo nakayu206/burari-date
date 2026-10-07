@@ -5,12 +5,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:burari_date/domain/entities/account_status.dart';
 import 'package:burari_date/domain/entities/subscription.dart';
+import 'package:burari_date/domain/repositories/account_repository.dart';
 import 'package:burari_date/domain/repositories/purchase_repository.dart';
-import 'package:burari_date/presentation/pages/settings/account_page.dart';
 import 'package:burari_date/presentation/pages/settings/purchase_page.dart';
+import 'package:burari_date/presentation/providers/account_providers.dart';
 import 'package:burari_date/presentation/providers/auth_providers.dart';
 import 'package:burari_date/presentation/providers/purchase_providers.dart';
+
+/// 登録の呼び出しを、記録するだけの偽のアカウントのリポジトリ。
+class _FakeAccountRepository implements AccountRepository {
+  _FakeAccountRepository(this.log);
+
+  final List<String> log;
+  AccountStatus status = const AccountStatus.guest();
+  Object? registerError;
+  Completer<void>? registerGate;
+  Object? signInError;
+
+  /// ログインしたときに、呼ぶ(ログインした先のアカウントの、購読の状態を、設定するため)。
+  void Function()? onSignIn;
+
+  @override
+  Future<AccountStatus> loadStatus() async => status;
+
+  @override
+  Future<AccountStatus> signIn(LoginMethod method) async {
+    log.add('signIn');
+    if (signInError != null) throw signInError!;
+    onSignIn?.call();
+    return status = AccountStatus.registered(
+      method: method,
+      email: 'existing@example.com',
+    );
+  }
+
+  @override
+  Future<AccountStatus> register(LoginMethod method) async {
+    log.add('register');
+    await registerGate?.future;
+    if (registerError != null) throw registerError!;
+    return status = AccountStatus.registered(method: method);
+  }
+
+  @override
+  Future<AccountStatus> signOut() async => status = const AccountStatus.guest();
+}
 
 /// 状態を持つだけの偽のリポジトリ。[purchaseError]・[restoreResult]などで、結果を変える。
 class _FakePurchaseRepository implements PurchaseRepository {
@@ -45,8 +86,12 @@ class _FakePurchaseRepository implements PurchaseRepository {
     return status = refreshResult ?? status;
   }
 
+  /// 呼び出しの順番の記録(登録 → 購入の順を、確かめるため。nullなら記録しない)。
+  List<String>? log;
+
   @override
   Future<SubscriptionStatus> purchase() async {
+    log?.add('purchase');
     purchaseCount++;
     await purchaseGate?.future;
     if (purchaseError != null) throw purchaseError!;
@@ -66,16 +111,23 @@ void main() {
     _FakePurchaseRepository repository, {
     bool hasAccount = true,
     SubscriptionUrlLauncher? launcher,
+    _FakeAccountRepository? accountRepository,
+    Size size = const Size(1170, 2532),
+    double pixelRatio = 1.0,
   }) async {
-    tester.view.physicalSize = const Size(1170, 2532);
-    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = pixelRatio;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           purchaseRepositoryProvider.overrideWithValue(repository),
-          hasAccountProvider.overrideWithValue(hasAccount),
+          // 登録の流れを試すときは、実際の登録の状態から、アカウントの有無を、導く。
+          if (accountRepository != null)
+            accountRepositoryProvider.overrideWithValue(accountRepository)
+          else
+            hasAccountProvider.overrideWithValue(hasAccount),
         ],
         child: MaterialApp(
           home: launcher == null
@@ -471,21 +523,303 @@ void main() {
     });
   });
 
-  group('アカウント未登録', () {
-    testWidgets('購入の前に、アカウントの登録が必要なことを案内する', (tester) async {
+  group('アカウント未登録: Googleで登録して購入する(Issue #151)', () {
+    Finder registerAndPurchaseButton() =>
+        find.widgetWithText(ElevatedButton, 'Googleで登録して購入する');
+
+    testWidgets('登録が必要なことと、登録して購入するボタンを出す(アカウント画面へは、飛ばない)', (tester) async {
       await pumpPage(tester, _FakePurchaseRepository(), hasAccount: false);
 
-      expect(find.text('ご購入には、アカウントの登録が必要です。'), findsOneWidget);
+      expect(find.textContaining('ご購入には、アカウントの登録が必要です'), findsOneWidget);
+      expect(find.textContaining('履歴とお気に入りを、そのまま引き継げます'), findsOneWidget);
+      expect(registerAndPurchaseButton(), findsOneWidget);
       expect(purchaseButton(), findsNothing);
+      // 別の画面に移る、これまでのボタンは、出さない。
+      expect(find.text('アカウントを登録する'), findsNothing);
     });
 
-    testWidgets('「アカウントを登録する」で、アカウント画面へ移る', (tester) async {
-      await pumpPage(tester, _FakePurchaseRepository(), hasAccount: false);
+    testWidgets('押すと、登録してから、続けて、購入し、購読中の表示になる', (tester) async {
+      final log = <String>[];
+      final purchases = _FakePurchaseRepository()..log = log;
+      await pumpPage(
+        tester,
+        purchases,
+        accountRepository: _FakeAccountRepository(log),
+      );
+      expect(registerAndPurchaseButton(), findsOneWidget);
 
-      await tester.tap(find.text('アカウントを登録する'));
+      await tester.tap(registerAndPurchaseButton());
       await tester.pumpAndSettle();
 
-      expect(find.byType(AccountPage), findsOneWidget);
+      expect(log, ['register', 'purchase'], reason: '登録のあとに、購入');
+      expect(find.text('ご購入ありがとうございます'), findsOneWidget);
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(find.text('ご利用中のプランです'), findsOneWidget);
+    });
+
+    testWidgets('登録から購入まで、処理中のままで、ボタンを押せない', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)..registerGate = Completer();
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(registerAndPurchaseButton());
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        isNull,
+      );
+
+      account.registerGate!.complete();
+      await tester.pumpAndSettle();
+      expect(log, ['register', 'purchase']);
+    });
+
+    testWidgets('Googleのアカウントの選択を取りやめたら、何も出さず、購入に進まない', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)
+        ..registerError = const AccountCancelledException();
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(registerAndPurchaseButton());
+      await tester.pumpAndSettle();
+
+      expect(log, ['register']);
+      expect(find.byType(AlertDialog), findsNothing);
+      // もう一度、押せる。
+      expect(
+        tester.widget<ElevatedButton>(registerAndPurchaseButton()).onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('登録に失敗したら、その旨を知らせ、購入には進まない', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)
+        ..registerError = const AccountException('通信できませんでした。');
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(registerAndPurchaseButton());
+      await tester.pumpAndSettle();
+
+      expect(find.text('アカウントを登録できませんでした'), findsOneWidget);
+      expect(find.text('通信できませんでした。'), findsOneWidget);
+      expect(log, ['register'], reason: '購入には進まない');
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(registerAndPurchaseButton(), findsOneWidget);
+    });
+
+    testWidgets('登録できて、購入を取りやめたら、登録済みのまま、購入のボタンが出る', (tester) async {
+      final log = <String>[];
+      final purchases = _FakePurchaseRepository()
+        ..log = log
+        ..purchaseError = const PurchaseCancelledException();
+      await pumpPage(
+        tester,
+        purchases,
+        accountRepository: _FakeAccountRepository(log),
+      );
+
+      await tester.tap(registerAndPurchaseButton());
+      await tester.pumpAndSettle();
+
+      expect(log, ['register', 'purchase']);
+      expect(find.byType(AlertDialog), findsNothing);
+      // 登録は済んでいるので、「登録して」ではなく、「購入する」が出る。
+      expect(registerAndPurchaseButton(), findsNothing);
+      expect(purchaseButton(), findsOneWidget);
+    });
+
+    testWidgets('登録できて、購入に失敗したら、その旨を知らせ、購入のボタンが出る', (tester) async {
+      final log = <String>[];
+      final purchases = _FakePurchaseRepository()
+        ..log = log
+        ..purchaseError = const PurchaseException('ストアに接続できませんでした。');
+      await pumpPage(
+        tester,
+        purchases,
+        accountRepository: _FakeAccountRepository(log),
+      );
+
+      await tester.tap(registerAndPurchaseButton());
+      await tester.pumpAndSettle();
+
+      expect(find.text('ご購入を完了できませんでした'), findsOneWidget);
+      expect(find.text('ストアに接続できませんでした。'), findsOneWidget);
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(purchaseButton(), findsOneWidget);
+    });
+  });
+
+  group('アカウント未登録: 登録済みの方の、ログイン(Issue #153)', () {
+    Finder signInLink() => find.text('登録済みの方は、Googleでログイン');
+
+    testWidgets('「登録して購入する」の下に、小さく、登録済みの方の、ログインの入口を出す', (tester) async {
+      await pumpPage(tester, _FakePurchaseRepository(), hasAccount: false);
+
+      expect(find.text('Googleで登録して購入する'), findsOneWidget);
+      expect(signInLink(), findsOneWidget);
+      // プラン画面は、コンパクトに(見出し・「または」の線は、アカウント画面だけ)。
+      expect(find.text('または'), findsNothing);
+      // 登録して購入するボタンの下に、ログインの入口がある。
+      final register = tester.getRect(
+        find.widgetWithText(ElevatedButton, 'Googleで登録して購入する'),
+      );
+      expect(tester.getRect(signInLink()).top, greaterThan(register.bottom));
+    });
+
+    testWidgets('未登録のときも、スクロールなしの、1画面に収まる(Pixel 8a)', (tester) async {
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository(),
+        hasAccount: false,
+        size: const Size(1080, 2400),
+        pixelRatio: 2.625,
+      );
+
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      expect(position.maxScrollExtent, 0);
+    });
+
+    testWidgets('押すと、先に、確認を出す(ゲストの履歴が使えなくなる旨)。やめるなら、ログインしない', (tester) async {
+      final log = <String>[];
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: _FakeAccountRepository(log),
+      );
+
+      await tester.tap(signInLink());
+      await tester.pumpAndSettle();
+
+      expect(find.text('ログインしますか?'), findsOneWidget);
+      expect(find.textContaining('引き継がれず、使えなくなります'), findsOneWidget);
+      expect(log, isEmpty, reason: '確認の前には、ログインしない');
+
+      await tester.tap(find.text('やめる'));
+      await tester.pumpAndSettle();
+
+      expect(log, isEmpty);
+      expect(signInLink(), findsOneWidget);
+    });
+
+    testWidgets('ログインできて、購読していなければ、購入には進まず、「…で購入する」が出る', (tester) async {
+      final log = <String>[];
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: _FakeAccountRepository(log),
+      );
+
+      await tester.tap(signInLink());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(log, ['signIn'], reason: '登録でも、購入でもない');
+      expect(find.text('Googleで登録して購入する'), findsNothing);
+      expect(purchaseButton(), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('ログインした先で、すでに購読中なら、購入には進まず、引き継がれた旨を知らせる', (tester) async {
+      final log = <String>[];
+      final purchases = _FakePurchaseRepository()..log = log;
+      final account = _FakeAccountRepository(log)
+        // ログインした先のアカウントは、購読中。
+        ..onSignIn = () => purchases.status = SubscriptionStatus.active(
+          renewsOn: DateTime(2026, 11, 5),
+        );
+      await pumpPage(tester, purchases, accountRepository: account);
+
+      await tester.tap(signInLink());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ログインしました'), findsOneWidget);
+      expect(find.text('ご利用中のプランが、引き継がれました。'), findsOneWidget);
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(find.text('ご利用中のプランです'), findsOneWidget);
+      expect(log, ['signIn'], reason: 'すでに購読中なので、購入には進まない');
+    });
+
+    testWidgets('Googleのアカウントの選択を取りやめたら、何も出さない', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)
+        ..signInError = const AccountCancelledException();
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(signInLink());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(signInLink(), findsOneWidget);
+    });
+
+    testWidgets('ログインに失敗したら、その旨を知らせる', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)
+        ..signInError = const AccountException('通信できませんでした。');
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(signInLink());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ログインできませんでした'), findsOneWidget);
+      expect(find.text('通信できませんでした。'), findsOneWidget);
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(signInLink(), findsOneWidget);
+    });
+
+    testWidgets('登録で、すでに登録済みのGoogleアカウントだったら、「ログイン」へ誘導する', (tester) async {
+      final log = <String>[];
+      final account = _FakeAccountRepository(log)
+        ..registerError = const AccountAlreadyRegisteredException();
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository()..log = log,
+        accountRepository: account,
+      );
+
+      await tester.tap(find.text('Googleで登録して購入する'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('アカウントを登録できませんでした'), findsOneWidget);
+      expect(find.textContaining('「Googleでログイン」から、入ってください'), findsOneWidget);
+      expect(log, ['register'], reason: '購入には進まない');
     });
   });
 
