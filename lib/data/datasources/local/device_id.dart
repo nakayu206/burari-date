@@ -34,6 +34,9 @@ class DeviceId {
   /// 英数字32文字(サーバーが受け付ける、16〜64文字の英数字)。
   String _generate() {
     const chars = '0123456789abcdef';
-    return List.generate(32, (_) => chars[_random.nextInt(chars.length)]).join();
+    return List.generate(
+      32,
+      (_) => chars[_random.nextInt(chars.length)],
+    ).join();
   }
 }

@@ -21,7 +21,9 @@ void main() {
   });
 
   test('保存済みの識別子があれば、それを使う', () async {
-    SharedPreferences.setMockInitialValues({'device.id': 'saved-0123456789abcdef'});
+    SharedPreferences.setMockInitialValues({
+      'device.id': 'saved-0123456789abcdef',
+    });
 
     expect(await DeviceId().get(), 'saved-0123456789abcdef');
   });
