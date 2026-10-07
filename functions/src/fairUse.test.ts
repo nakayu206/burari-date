@@ -6,6 +6,7 @@ import {
   applyCharge,
   applyRefund,
   isSubscriptionActive,
+  SUBSCRIPTION_GRACE_MS,
   isValidGachaId,
   LIFETIME_FREE_LIMIT,
   MONTHLY_FAIR_USE_LIMIT,
@@ -150,12 +151,24 @@ test("月の区切りは、日本時間(UTCの15時に月が変わる)", () => {
 
 test("購読中の判断: activeで、期限が過ぎていなければ、購読中", () => {
   const future = new Date(NOW.getTime() + 86400000);
-  const past = new Date(NOW.getTime() - 86400000);
   assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: future }, NOW), true);
-  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: past }, NOW), false);
   assert.equal(isSubscriptionActive({ subscriptionStatus: "inactive", subscriptionExpiresAt: future }, NOW), false);
   assert.equal(isSubscriptionActive({}, NOW), false);
   assert.equal(isSubscriptionActive(undefined, NOW), false);
+});
+
+test("購読中の判断: 期限を過ぎても、猶予(6時間)の間は、更新の通知を待って、購読中", () => {
+  const justPast = new Date(NOW.getTime() - 90 * 1000);
+  const insideGrace = new Date(NOW.getTime() - SUBSCRIPTION_GRACE_MS + 1000);
+  const outsideGrace = new Date(NOW.getTime() - SUBSCRIPTION_GRACE_MS - 1000);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: justPast }, NOW), true);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: insideGrace }, NOW), true);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "active", subscriptionExpiresAt: outsideGrace }, NOW), false);
+});
+
+test("購読中の判断: 切れた(inactive)と通知されたら、猶予の間でも、購読中ではない", () => {
+  const justPast = new Date(NOW.getTime() - 90 * 1000);
+  assert.equal(isSubscriptionActive({ subscriptionStatus: "inactive", subscriptionExpiresAt: justPast }, NOW), false);
 });
 
 test("購読中の判断: 期限がなければ、状態だけで判断する", () => {
@@ -177,7 +190,7 @@ test("購読中の判断: FirestoreのTimestamp(toMillis)・ミリ秒も、期�
   );
   assert.equal(
     isSubscriptionActive(
-      { subscriptionStatus: "active", subscriptionExpiresAt: NOW.getTime() - 1 },
+      { subscriptionStatus: "active", subscriptionExpiresAt: NOW.getTime() - SUBSCRIPTION_GRACE_MS - 1 },
       NOW,
     ),
     false,
