@@ -37,10 +37,32 @@ export async function searchGourmet(
   if (!res.ok) {
     throw new Error(`ホットペッパーグルメAPI呼び出しに失敗しました: ${res.status}`);
   }
-  const body = (await res.json()) as {
-    results?: { shop?: RawHotPepperShop[] };
-  };
-  return (body.results?.shop ?? []).map(toRawPlace);
+  return parseGourmetResponse(await res.json());
+}
+
+/**
+ * ホットペッパーグルメAPIの応答から、店舗を取り出す。このAPIは、認証エラーや障害の
+ * ときも、HTTP 200を返し、本文の`results.error`にエラーを入れる。これを「店舗が0件の
+ * 成功」と見なすと、候補が出ないのに利用枠を消費してしまうため、失敗として投げる
+ * (呼び出し元のgetCandidatesが、確保した枠を戻せる)。
+ */
+export function parseGourmetResponse(body: unknown): RawPlace[] {
+  const results = (body as { results?: unknown } | null | undefined)?.results as
+    | { shop?: unknown; error?: unknown }
+    | undefined;
+  if (results === undefined || results === null || typeof results !== "object") {
+    throw new Error("ホットペッパーグルメAPIの応答が、想定した形式ではありません");
+  }
+  if (results.error !== undefined) {
+    const first = Array.isArray(results.error) ? results.error[0] : results.error;
+    const { code, message } = (first ?? {}) as { code?: unknown; message?: unknown };
+    throw new Error(
+      `ホットペッパーグルメAPIがエラーを返しました: ${String(code ?? "")} ${String(message ?? "")}`.trim(),
+    );
+  }
+  // 店舗が0件のときは、shopが空の配列(または、ない)。これは、失敗ではない。
+  const shops = Array.isArray(results.shop) ? (results.shop as RawHotPepperShop[]) : [];
+  return shops.map(toRawPlace);
 }
 
 function toRawPlace(shop: RawHotPepperShop): RawPlace {
