@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../datasources/cloud/anonymous_auth.dart';
+import '../datasources/local/device_id.dart';
 import '../../domain/entities/ai_preference.dart';
 import '../../domain/entities/candidate.dart';
 import '../../domain/entities/station.dart';
@@ -17,7 +18,11 @@ class CandidateRepositoryImpl implements CandidateRepository {
   CandidateRepositoryImpl({
     CandidatesCallable? callable,
     Future<void> Function()? ensureSignedIn,
+    Future<String?> Function()? deviceId,
   }) : _callable = callable ?? _defaultCallable,
+       // 注入した[callable](テスト)のときは、端末の保存領域には触れない。
+       _deviceId =
+           deviceId ?? (callable == null ? _defaultDeviceId : _noDeviceId),
        // 注入した[callable](テスト)のときは、本物のFirebaseAuthには触れない。
        _ensureSignedIn =
            ensureSignedIn ??
@@ -33,6 +38,20 @@ class CandidateRepositoryImpl implements CandidateRepository {
   }
 
   static Future<void> _noSignIn() async {}
+
+  /// 無料枠を、端末ごとにも数えるための、端末の識別子(Issue #165)。
+  final Future<String?> Function() _deviceId;
+
+  /// 取れなかったとき(保存領域の失敗など)は、送らない。サーバーは、ユーザーだけで数える。
+  static Future<String?> _defaultDeviceId() async {
+    try {
+      return await DeviceId.instance.get();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> _noDeviceId() async => null;
 
   static Future<Map<String, dynamic>> _defaultCallable(
     Map<String, dynamic> data,
@@ -64,6 +83,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
       );
     }
 
+    final deviceId = await _deviceId();
+
     Map<String, dynamic> data;
     try {
       data = await _callable({
@@ -75,6 +96,8 @@ class CandidateRepositoryImpl implements CandidateRepository {
             : 'sightseeing',
         // 同じガチャのグルメ・観光を、無料枠で1回と数えるためのID。
         'gachaId': gachaId,
+        // ログアウトで無料枠が数え直されないよう、端末ごとにも数える(再インストールは、バックアップの復元しだい)。
+        'deviceId': ?deviceId,
         // 未設定のときはキー自体を送らず、バックエンドは従来どおりの提案にする。
         if (preference != null)
           'preference': {

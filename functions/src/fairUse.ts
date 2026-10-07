@@ -40,6 +40,17 @@ export function isValidGachaId(value: unknown): value is string {
   return typeof value === "string" && GACHA_ID_PATTERN.test(value);
 }
 
+/** deviceIdとして受け付ける形式(FirestoreのドキュメントIDに使うため制限する) */
+const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
+/**
+ * 端末ごとの識別子として受け付けられるか。アプリが最初に1回だけ作るランダムなIDで、
+ * 無料枠を、ログアウトで数え直されないようにするために使う(再インストールは、バックアップで復元されたときだけ防げる)。
+ */
+export function isValidDeviceId(value: unknown): value is string {
+  return typeof value === "string" && DEVICE_ID_PATTERN.test(value);
+}
+
 /**
  * 回数の判断に使う、ユーザーの利用状況。Firestoreの値([readUserUsage])を、判断に
  * 使う形にしたもの。
@@ -97,14 +108,23 @@ export function isSubscriptionActive(
 /** 期限を過ぎたあとも、更新の通知を待つ猶予(6時間) */
 export const SUBSCRIPTION_GRACE_MS = 6 * 60 * 60 * 1000;
 
-/** ユーザーのドキュメントの値を、判断に使う利用状況にする(月が変われば、月の回数は0) */
+/**
+ * ユーザーのドキュメントの値を、判断に使う利用状況にする(月が変われば、月の回数は0)。
+ *
+ * 無料枠の使用回数は、ユーザーと端末(`deviceData`)の、多いほうにする。ログアウトで
+ * 新しいゲストになっても、端末の記録が残るため、無料枠が数え直されない。
+ */
 export function readUserUsage(
   data: FirebaseFirestore.DocumentData | undefined,
   now: Date,
+  deviceData?: FirebaseFirestore.DocumentData,
 ): UserUsage {
   const isSameMonth = data?.monthlyKey === monthKeyOf(now);
   return {
-    lifetimeFreeUsed: countOf(data?.lifetimeFreeUsed),
+    lifetimeFreeUsed: Math.max(
+      countOf(data?.lifetimeFreeUsed),
+      countOf(deviceData?.lifetimeFreeUsed),
+    ),
     isSubscriber: isSubscriptionActive(data, now),
     monthlyUsed: isSameMonth ? countOf(data?.monthlyGachaCount) : 0,
     extraCredits: countOf(data?.extraGachaCredits),
@@ -257,23 +277,29 @@ export function planRelease(
  * `gachaId`があれば、1回のガチャのグルメ・観光を1回と数える。ない(古い
  * バージョンのアプリ)ときは、従来どおり呼び出しごとに数える。
  * どの回数(無料枠・月の回数・追加購入)を使うかは、[planCharge]。
+ *
+ * `deviceId`があれば、無料枠は、端末ごとにも数える(ログアウトで
+ * 無料枠が戻らないようにするため)。
  */
 export async function reserveUsage(
   uid: string,
   category: string,
   gachaId?: string,
   now: Date = new Date(),
+  deviceId?: string,
 ): Promise<Reservation> {
   const db = getFirestore();
   const userRef = db.collection("users").doc(uid);
+  const deviceRef = deviceId ? db.collection("devices").doc(deviceId) : undefined;
   const gachaRef = gachaId
     ? userRef.collection("gachaUsage").doc(gachaId)
     : undefined;
 
   return db.runTransaction(async (tx) => {
     const userSnap = await tx.get(userRef);
+    const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
-    const usage = readUserUsage(userSnap.data(), now);
+    const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
     const recorded = gachaSnap?.data()?.categories as string[] | undefined;
 
     const { source } = planUsage(usage, recorded, category);
@@ -284,6 +310,13 @@ export async function reserveUsage(
         { ...applyCharge(source, usage, now), updatedAt: now },
         { merge: true },
       );
+      if (deviceRef && source === "free") {
+        tx.set(
+          deviceRef,
+          { lifetimeFreeUsed: usage.lifetimeFreeUsed + 1, updatedAt: now },
+          { merge: true },
+        );
+      }
     }
     if (gachaRef) {
       // 記録が古い形式(chargedなし)のときは、消費済みとみなす。
@@ -317,9 +350,11 @@ export async function releaseUsage(
   category: string,
   gachaId?: string,
   now: Date = new Date(),
+  deviceId?: string,
 ): Promise<void> {
   const db = getFirestore();
   const userRef = db.collection("users").doc(uid);
+  const deviceRef = deviceId ? db.collection("devices").doc(deviceId) : undefined;
   const gachaRef = gachaId
     ? userRef.collection("gachaUsage").doc(gachaId)
     : undefined;
@@ -327,6 +362,7 @@ export async function releaseUsage(
   await db.runTransaction(async (tx) => {
     // 記録の読み取りが先(トランザクションでは、読み取りのあとに書き込む)。
     const userSnap = await tx.get(userRef);
+    const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const recorded = gachaSnap?.data()?.categories as string[] | undefined;
     const gachaCharged = gachaSnap?.exists
@@ -346,10 +382,17 @@ export async function releaseUsage(
         reservation.source ??
         (gachaSnap?.data()?.chargedSource as UsageSource | undefined) ??
         "free";
-      const usage = readUserUsage(userSnap.data(), now);
+      const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
       const refundFields = applyRefund(source, usage, now);
       if (Object.keys(refundFields).length > 0) {
         tx.set(userRef, { ...refundFields, updatedAt: now }, { merge: true });
+      }
+      if (deviceRef && source === "free") {
+        tx.set(
+          deviceRef,
+          { lifetimeFreeUsed: Math.max(0, usage.lifetimeFreeUsed - 1), updatedAt: now },
+          { merge: true },
+        );
       }
     }
     if (gachaRef && gachaSnap?.exists) {

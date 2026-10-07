@@ -6,6 +6,7 @@ import {
   applyCharge,
   applyRefund,
   isSubscriptionActive,
+  isValidDeviceId,
   SUBSCRIPTION_GRACE_MS,
   isValidGachaId,
   LIFETIME_FREE_LIMIT,
@@ -343,4 +344,39 @@ test("gachaIdの形式を検証する(英数字・_・-のみ、64文字まで)"
   assert.equal(isValidGachaId("a".repeat(65)), false);
   assert.equal(isValidGachaId(123), false);
   assert.equal(isValidGachaId(undefined), false);
+});
+
+// ---- 端末ごとの無料枠 ----
+
+test("無料枠の使用回数は、ユーザーと端末の、多いほうにする(ログアウトで新しいゲストになっても戻らない)", () => {
+  // 新しいゲスト(0回)でも、同じ端末で、すでに10回使っていれば、使用済み。
+  assert.equal(readUserUsage({}, NOW, { lifetimeFreeUsed: 10 }).lifetimeFreeUsed, 10);
+  // 端末の記録が少なくても、ユーザーの記録が多ければ、ユーザーの記録(別の端末で、使った分)。
+  assert.equal(readUserUsage({ lifetimeFreeUsed: 7 }, NOW, { lifetimeFreeUsed: 2 }).lifetimeFreeUsed, 7);
+  // 端末の記録がなければ、ユーザーだけで数える(古いアプリ)。
+  assert.equal(readUserUsage({ lifetimeFreeUsed: 4 }, NOW).lifetimeFreeUsed, 4);
+});
+
+test("端末の記録で、無料枠を使い切っていれば、新しいゲストでも、拒否される", () => {
+  const usage = readUserUsage({}, NOW, { lifetimeFreeUsed: LIFETIME_FREE_LIMIT });
+  assert.throws(() => planCharge(usage), { code: "resource-exhausted" });
+});
+
+test("端末の記録で、無料枠を使い切っていても、購読中なら、月の回数を使える", () => {
+  const usage = readUserUsage(
+    { subscriptionStatus: "active" },
+    NOW,
+    { lifetimeFreeUsed: LIFETIME_FREE_LIMIT },
+  );
+  assert.deepEqual(planCharge(usage), { source: "monthly" });
+});
+
+test("deviceIdの形式: 16〜64文字の英数字・ハイフン・アンダースコア", () => {
+  assert.equal(isValidDeviceId("0123456789abcdef"), true);
+  assert.equal(isValidDeviceId("a1b2c3d4-e5f6-7890-abcd-ef1234567890"), true);
+  assert.equal(isValidDeviceId("short"), false);
+  assert.equal(isValidDeviceId("a".repeat(65)), false);
+  assert.equal(isValidDeviceId("../../users/other-user-id"), false);
+  assert.equal(isValidDeviceId(undefined), false);
+  assert.equal(isValidDeviceId(123), false);
 });
