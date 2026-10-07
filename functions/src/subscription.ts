@@ -159,6 +159,40 @@ export function shouldApplySync(
   return typeof storedSyncedAtMs !== "number" || requestedAtMs >= storedSyncedAtMs;
 }
 
+/** ログに残す、1人分の処理の結果 */
+export interface SyncLogEntry {
+  /** 対象のユーザー。IDは、先頭の6文字だけ(ログから、特定されにくくする) */
+  user: string;
+  status: "active" | "inactive";
+  /** 購読の期限(ISO形式)。期限がないときはnull */
+  expiresAt: string | null;
+  /** 保存したか。falseは、保存済みより古い取得だったため、上書きしなかった */
+  saved: boolean;
+}
+
+/**
+ * 通知を処理した結果を、ログの1行にする(Firestoreを使わない純粋な関数)。動いているか
+ * (通知が届き、購読の状態を保存できたか)を、ログから確かめるために使う。メールや氏名などの
+ * 個人情報は、出さない。
+ */
+export function describeSync(
+  eventType: string,
+  results: { uid: string; info: SubscriptionInfo; saved: boolean }[],
+): { message: string; event: string; users: SyncLogEntry[] } {
+  const users = results.map(({ uid, info, saved }) => ({
+    user: `${uid.slice(0, 6)}…`,
+    status: info.status,
+    expiresAt: info.expiresAtMs === null ? null : new Date(info.expiresAtMs).toISOString(),
+    saved,
+  }));
+  const saved = users.filter((u) => u.saved).length;
+  return {
+    message: `購読の状態を保存しました(${saved}/${users.length}人)`,
+    event: eventType,
+    users,
+  };
+}
+
 /** RevenueCatから、購読の状態を取り直す。失敗したら例外を投げる。 */
 export async function fetchSubscriptionInfo(
   apiKey: string,
