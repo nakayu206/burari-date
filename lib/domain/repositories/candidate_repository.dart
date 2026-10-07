@@ -28,7 +28,7 @@ enum LimitKind {
 
 /// 利用上限に達して、候補を取得できなかったことを表す例外。
 ///
-/// 上限の種類([kind])によって、画面が出す案内(登録・課金・追加課金)を分ける。
+/// 上限の種類([kind])によって、画面が出す案内(登録・課金・来月まで待つ)を分ける。
 /// 再読み込みしても解消しないため、画面は「再読み込み」を出さない。
 class CandidateLimitException extends CandidateFetchException {
   const CandidateLimitException(

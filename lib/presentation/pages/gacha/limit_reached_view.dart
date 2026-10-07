@@ -18,7 +18,7 @@ import '../settings/purchase_page.dart';
 /// |---|---|
 /// | 無料枠を使い切った・アカウントなし(匿名) | アカウント登録と課金 |
 /// | 無料枠を使い切った・アカウントあり | 課金する |
-/// | 課金後の月の上限を超えた | 追加課金 |
+/// | 課金後の月の上限を超えた | なし(来月になると、また使える) |
 /// | 購入済みなのに、サーバーが、まだ無料枠の上限と答える | もう一度読み込む |
 ///
 /// プラン画面から戻ったとき、購読中になっていれば、[onRetry]で、候補を取り直す
@@ -26,8 +26,7 @@ import '../settings/purchase_page.dart';
 /// 購読の状態が反映されるまで、数秒かかるため、まだ上限と答えることがある。その間は、
 /// 反映を待つ案内と、「もう一度読み込む」を出す。
 ///
-/// 追加購入の画面は、価格・単位が決まっていないため、まだない。「追加課金」も、いまは
-/// プラン画面につなぐ。
+/// 追加購入は、ない(2026-10-07に決定)。月の上限は、来月(日本時間の月の替わり)まで待つ。
 class LimitReachedView extends ConsumerWidget {
   const LimitReachedView({
     super.key,
@@ -59,17 +58,18 @@ class LimitReachedView extends ConsumerWidget {
         // アカウントがないときは、バックエンドの案内(登録と課金)をそのまま出す。
         return hasAccount ? '無料利用の上限に達しました。継続利用には課金が必要です。' : error.message;
       case LimitKind.monthly:
-        return '今月の利用上限に達しました。追加でご利用の場合は、追加課金をご利用ください。';
+        return '今月の利用上限に達しました。来月になると、また、ご利用いただけます。';
     }
   }
 
-  String _buttonLabel(bool isSubscribed) {
+  /// ボタンの文言。ボタンを出さないときは、null。
+  String? _buttonLabel(bool isSubscribed) {
     if (_isWaitingForSync(isSubscribed)) return 'もう一度読み込む';
     switch (error.kind) {
       case LimitKind.freeTier:
         return hasAccount ? '課金する' : 'アカウント登録と課金';
       case LimitKind.monthly:
-        return '追加課金';
+        return null;
     }
   }
 
@@ -90,6 +90,7 @@ class LimitReachedView extends ConsumerWidget {
         .watch(subscriptionStatusProvider)
         .maybeWhen(data: (status) => status.isActive, orElse: () => false);
     final isWaiting = _isWaitingForSync(isSubscribed);
+    final buttonLabel = _buttonLabel(isSubscribed);
 
     return Center(
       child: Padding(
@@ -105,13 +106,15 @@ class LimitReachedView extends ConsumerWidget {
                 fontSize: AppFontSizes.bodyMedium,
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            ElevatedButton(
-              onPressed: isWaiting
-                  ? onRetry
-                  : () => _openPurchasePage(context, ref),
-              child: Text(_buttonLabel(isSubscribed)),
-            ),
+            if (buttonLabel != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              ElevatedButton(
+                onPressed: isWaiting
+                    ? onRetry
+                    : () => _openPurchasePage(context, ref),
+                child: Text(buttonLabel),
+              ),
+            ],
           ],
         ),
       ),
