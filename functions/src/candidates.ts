@@ -2,7 +2,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
-import { isValidGachaId, releaseUsage, reserveUsage } from "./fairUse";
+import { isValidDeviceId, isValidGachaId, releaseUsage, reserveUsage } from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
 import { parsePreference, prioritizeByGenres } from "./preference";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
@@ -18,6 +18,11 @@ interface GetCandidatesRequest {
    * ために使う(任意。ない古いバージョンのアプリは、呼び出しごとに数える)。
    */
   gachaId?: unknown;
+  /**
+   * 端末ごとの識別子(任意)。無料枠を、ログアウトで、数え直されない(再インストールは、バックアップで復元されたときだけ防げる)
+   * ようにするために、端末ごとにも数える。ない古いバージョンのアプリは、ユーザーだけで数える。
+   */
+  deviceId?: unknown;
   /** AI提案の好み設定(任意)。未設定なら従来どおりの提案にする。 */
   preference?: unknown;
 }
@@ -55,8 +60,13 @@ export const getCandidates = onCall<GetCandidatesRequest>(
       throw new HttpsError("invalid-argument", "リクエスト内容が不正です");
     }
 
+    const deviceId = request.data.deviceId;
+    if (deviceId !== undefined && !isValidDeviceId(deviceId)) {
+      throw new HttpsError("invalid-argument", "リクエスト内容が不正です");
+    }
+
     const uid = request.auth.uid;
-    const reservation = await reserveUsage(uid, category, gachaId);
+    const reservation = await reserveUsage(uid, category, gachaId, undefined, deviceId);
 
     try {
       const preference = parsePreference(request.data.preference);
@@ -92,7 +102,7 @@ export const getCandidates = onCall<GetCandidatesRequest>(
 
       return { candidates };
     } catch (e) {
-      await releaseUsage(uid, reservation, category, gachaId);
+      await releaseUsage(uid, reservation, category, gachaId, undefined, deviceId);
       throw e;
     }
   },

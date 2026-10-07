@@ -39,6 +39,44 @@ void main() {
       expect(called, isFalse);
     });
 
+    test('端末の識別子を、サーバーへ送る(無料枠を、端末ごとにも数えるため)', () async {
+      Map<String, dynamic>? sent;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          sent = data;
+          return {'candidates': []};
+        },
+        deviceId: () async => 'device-0123456789abcdef',
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
+
+      expect(sent!['deviceId'], 'device-0123456789abcdef');
+    });
+
+    test('端末の識別子が取れないときは、キー自体を送らない(サーバーは、ユーザーだけで数える)', () async {
+      Map<String, dynamic>? sent;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          sent = data;
+          return {'candidates': []};
+        },
+        deviceId: () async => null,
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
+
+      expect(sent!.containsKey('deviceId'), isFalse);
+    });
+
     test('ログインを確かめてから、候補を取得する', () async {
       final order = <String>[];
       final repository = CandidateRepositoryImpl(
