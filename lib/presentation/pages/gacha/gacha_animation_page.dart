@@ -205,7 +205,7 @@ class _GachaAnimationPageState extends ConsumerState<GachaAnimationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ガチャ演出')),
+      appBar: AppBar(title: const Text('駅ガチャ')),
       body: GestureDetector(
         onTap: (_started && !_finished) ? _skip : null,
         behavior: HitTestBehavior.opaque,

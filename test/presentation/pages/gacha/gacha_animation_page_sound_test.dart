@@ -87,6 +87,16 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('画面のタイトルは、利用者の言葉の「駅ガチャ」(開発者向けの呼び名は、出さない)', (tester) async {
+    await pumpPage(tester);
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('駅ガチャ')),
+      findsOneWidget,
+    );
+    expect(find.text('ガチャ演出'), findsNothing);
+  });
+
   testWidgets('効果音がオンなら、演出に合わせて、フリップ・確定・フリップ・決定の順に鳴らす', (tester) async {
     final player = await pumpPage(tester);
     expect(player.played, isEmpty, reason: '「ガチャる」を押すまでは鳴らさない');
