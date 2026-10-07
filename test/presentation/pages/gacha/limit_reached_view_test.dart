@@ -180,7 +180,9 @@ void main() {
         repository: _FakePurchaseRepository(const SubscriptionStatus.active()),
       );
 
-      expect(find.textContaining('購入ありがとうございます'), findsOneWidget);
+      expect(find.textContaining('購読の状態を、確認しています'), findsOneWidget);
+      // 更新の遅れでも出る状態なので、「購入」とは言わない。
+      expect(find.textContaining('購入'), findsNothing);
       expect(find.text('課金する'), findsNothing);
       expect(find.text(backendMessage), findsNothing);
 
