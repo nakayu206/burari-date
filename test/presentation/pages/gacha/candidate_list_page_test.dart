@@ -59,6 +59,31 @@ void main() {
       walkMinutes: 4,
     );
 
+    testWidgets('題名・タブ・店名は、ドット書体ではなく、ほかの画面と同じ普通の書体', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => [gourmetCandidate],
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 題名・タブ・店名の文字の、書体の名前に、ドット書体(DotGothic16)が入っていない。
+      for (final text in ['おでかけスポット', 'グルメ', '観光', 'テスト洋食屋']) {
+        final style = tester.widget<Text>(find.text(text).first).style;
+        final family = style?.fontFamily ?? '';
+        expect(
+          family.contains('DotGothic16'),
+          isFalse,
+          reason: '「$text」が、ドット書体になっている: $family',
+        );
+      }
+    });
+
     testWidgets('グルメタブにはホットペッパーのクレジットを表示する', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

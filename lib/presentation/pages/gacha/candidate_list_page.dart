@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
@@ -45,25 +44,19 @@ class _CandidateListPageState extends ConsumerState<CandidateListPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // 題名とタブは、電車・駅名標と同じ、ドット絵に合う書体にする。
-        title: Text(
-          'おでかけスポット',
-          style: GoogleFonts.dotGothic16(
-            color: AppColors.textPrimary,
-            fontSize: AppFontSizes.titleMedium,
-          ),
-        ),
+        title: const Text('おでかけスポット'),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
-          // ドット書体は太字がないため、選んでいるタブは、色と下線で区別する。
-          labelStyle: GoogleFonts.dotGothic16(
-            fontSize: AppFontSizes.titleMedium,
+          labelStyle: const TextStyle(
+            fontSize: AppFontSizes.bodyMedium,
+            fontWeight: FontWeight.bold,
           ),
-          unselectedLabelStyle: GoogleFonts.dotGothic16(
-            fontSize: AppFontSizes.titleMedium,
+          unselectedLabelStyle: const TextStyle(
+            fontSize: AppFontSizes.bodyMedium,
+            fontWeight: FontWeight.normal,
           ),
           tabs: const [
             Tab(text: 'グルメ'),
@@ -249,15 +242,12 @@ class _CandidateListView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 店名・スポット名(各カードのタイトル)は、ドット絵に合う書体にする。
-                      // 長い名前は2行までで切る。
                       Text(
                         candidate.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.dotGothic16(
+                        style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: AppFontSizes.titleMedium,
+                          fontSize: AppFontSizes.bodyLarge,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
