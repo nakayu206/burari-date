@@ -12,7 +12,20 @@
           "package_name": "com.buraridate.burari_date"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "889357641434-qrmfv2k4e9q3mic0nnbr2v6nq37efqkg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.buraridate.burari_date",
+            "certificate_hash": "fe9af39f796e70b26a849e99850fefcd76f67c66"
+          }
+        },
+        {
+          "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "889357641434-cb85nn6uaht87kkle67oe3m5k4h827p9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.buraridate.burariDate"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,20 @@
           "package_name": "com.buraridate.burari_date.dev"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "889357641434-902rv237qe1bgmju5ejm9o8acul8ehl8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.buraridate.burari_date.dev",
+            "certificate_hash": "3ccb3183192b51a1c78420c443fe484f8ad4d6af"
+          }
+        },
+        {
+          "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "889357641434-cb85nn6uaht87kkle67oe3m5k4h827p9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.buraridate.burariDate"
+              }
+            }
+          ]
         }
       }
     },
@@ -50,7 +100,12 @@
           "package_name": "com.buraridate.burari_date.stg"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBKwTlsAhE2Y3w8F-a_qfOr-CNG7afal2w"
@@ -58,7 +113,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "889357641434-bf9kb7e5hmouu1t9iag2pa0qojj3ge8e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "889357641434-cb85nn6uaht87kkle67oe3m5k4h827p9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.buraridate.burariDate"
+              }
+            }
+          ]
         }
       }
     }
