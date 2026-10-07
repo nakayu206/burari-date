@@ -51,7 +51,8 @@ class LimitReachedView extends ConsumerWidget {
 
   String _message(bool isSubscribed) {
     if (_isWaitingForSync(isSubscribed)) {
-      return '購入ありがとうございます。購入の内容が反映されるまで、数秒かかることがあります。';
+      // 購入の直後だけでなく、月の更新の通知が遅れたときも、同じ状態になる。購入に触れない。
+      return '購読の状態を、確認しています。数秒後に、もう一度、お試しください。';
     }
     switch (error.kind) {
       case LimitKind.freeTier:
