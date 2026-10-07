@@ -170,6 +170,118 @@ void main() {
     });
   });
 
+  group('ログイン(Issue #152)', () {
+    Finder signInButton() => find.widgetWithText(OutlinedButton, 'Googleでログイン');
+
+    testWidgets('ゲストのとき、「登録する」とは別のまとまり(見出しと「または」の線で分ける)に、「Googleでログイン」を出す', (
+      tester,
+    ) async {
+      await pumpPage(tester, _FakeAccountRepository());
+
+      expect(find.text('はじめての方'), findsOneWidget);
+      expect(find.text('すでに登録済みの方'), findsOneWidget);
+      expect(find.text('または'), findsOneWidget);
+      expect(find.text('Googleで登録する'), findsOneWidget);
+      expect(signInButton(), findsOneWidget);
+      expect(find.textContaining('以前の履歴・お気に入り・購読が、戻ります'), findsOneWidget);
+
+      // 登録のボタンと、ログインのボタンは、十分に、離れている(押し間違いを防ぐ)。
+      final register = tester.getRect(
+        find.widgetWithText(ElevatedButton, 'Googleで登録する'),
+      );
+      final signIn = tester.getRect(signInButton());
+      expect(signIn.top - register.bottom, greaterThanOrEqualTo(80));
+    });
+
+    testWidgets('押すと、先に、確認を出す。やめるなら、ログインしない', (tester) async {
+      final repository = _FakeAccountRepository();
+      await pumpPage(tester, repository);
+
+      await tester.tap(signInButton());
+      await tester.pumpAndSettle();
+
+      expect(find.text('ログインしますか?'), findsOneWidget);
+      expect(find.textContaining('引き継がれず、使えなくなります'), findsOneWidget);
+      expect(repository.signedIn, isEmpty, reason: '確認の前には、ログインしない');
+
+      await tester.tap(find.text('やめる'));
+      await tester.pumpAndSettle();
+
+      expect(repository.signedIn, isEmpty);
+      expect(find.text('ゲスト利用中'), findsOneWidget);
+    });
+
+    testWidgets('「ログインする」で、ログインし、登録済みの表示になる(登録は、呼ばない)', (tester) async {
+      final repository = _FakeAccountRepository();
+      await pumpPage(tester, repository);
+
+      await tester.tap(signInButton());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(repository.signedIn, [LoginMethod.google]);
+      expect(repository.registered, isEmpty);
+      expect(find.text('アカウント登録済み'), findsOneWidget);
+      expect(find.text('existing@example.com'), findsOneWidget);
+    });
+
+    testWidgets('Googleのアカウントの選択を取りやめたら、何も出さない', (tester) async {
+      final repository = _FakeAccountRepository()
+        ..signInError = const AccountCancelledException();
+      await pumpPage(tester, repository);
+
+      await tester.tap(signInButton());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('ゲスト利用中'), findsOneWidget);
+    });
+
+    testWidgets('ログインに失敗したら、理由をダイアログで知らせ、ゲストのまま', (tester) async {
+      final repository = _FakeAccountRepository()
+        ..signInError = const AccountException('通信できませんでした。');
+      await pumpPage(tester, repository);
+
+      await tester.tap(signInButton());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ログインする'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ログインできませんでした'), findsOneWidget);
+      expect(find.text('通信できませんでした。'), findsOneWidget);
+      await tester.tap(find.text('閉じる'));
+      await tester.pumpAndSettle();
+      expect(find.text('ゲスト利用中'), findsOneWidget);
+    });
+
+    testWidgets('登録で、すでに登録済みのGoogleアカウントだったら、「ログイン」へ誘導する', (tester) async {
+      final repository = _FakeAccountRepository()
+        ..registerError = const AccountAlreadyRegisteredException();
+      await pumpPage(tester, repository);
+
+      await tester.tap(find.text('Googleで登録する'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('アカウントを登録できませんでした'), findsOneWidget);
+      expect(find.textContaining('「Googleでログイン」から、入ってください'), findsOneWidget);
+    });
+
+    testWidgets('登録済みのときは、ログインのボタンを出さない(ログアウトだけ)', (tester) async {
+      await pumpPage(
+        tester,
+        _FakeAccountRepository(
+          const AccountStatus.registered(method: LoginMethod.google),
+        ),
+      );
+
+      expect(signInButton(), findsNothing);
+      expect(find.text('ログアウト'), findsOneWidget);
+    });
+  });
+
   group('登録済み', () {
     final registered = _FakeAccountRepository(
       const AccountStatus.registered(

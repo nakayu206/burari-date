@@ -5,11 +5,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_font_sizes.dart';
 import '../../../core/constants/app_spacing.dart';
+import '../../../domain/entities/account_status.dart';
 import '../../../domain/entities/subscription.dart';
+import '../../../domain/repositories/account_repository.dart';
 import '../../../domain/repositories/purchase_repository.dart';
+import '../../providers/account_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/purchase_providers.dart';
-import 'account_page.dart';
+import '../../widgets/auth_section.dart';
+import '../../widgets/login_confirm_dialog.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
 /// テストでは実プラットフォーム呼び出し(ストアアプリの起動)を避けるため差し替える。
@@ -75,7 +79,7 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
   }
 
   Future<void> _purchase() async {
-    await _run(
+    await _run<SubscriptionStatus>(
       errorTitle: 'ご購入を完了できませんでした',
       action: () => ref.read(subscriptionStatusProvider.notifier).purchase(),
       onDone: (status) => status.isActive
@@ -85,7 +89,7 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
   }
 
   Future<void> _restore() async {
-    await _run(
+    await _run<SubscriptionStatus>(
       errorTitle: '購入を復元できませんでした',
       action: () => ref.read(subscriptionStatusProvider.notifier).restore(),
       onDone: (status) => status.isActive
@@ -94,33 +98,110 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
     );
   }
 
-  Future<void> _run({
-    required String errorTitle,
-    required Future<SubscriptionStatus> Function() action,
-    required Future<void> Function(SubscriptionStatus status) onDone,
-  }) async {
+  /// アカウント未登録のときの、「Googleで登録して購入する」(Issue #151)。Googleで登録
+  /// し、登録できたら、続けて購入に進む。画面を行き来しなくてよいよう、登録から購入まで、
+  /// 処理中のままにする。
+  ///
+  /// - 登録を取りやめたとき: 何も出さず、購入には進まない。
+  /// - 登録に失敗したとき: その旨を知らせ、購入には進まない。
+  /// - 登録できて、購入だけ、失敗・取りやめたとき: 登録済みのままになる。プラン画面に、
+  ///   購入のボタンが出るので、そこから、もう一度、購入できる。
+  Future<void> _registerAndPurchase() async {
     if (_isBusy) return;
     setState(() => _isBusy = true);
-    SubscriptionStatus? status;
+    final registered = await _run<void>(
+      errorTitle: 'アカウントを登録できませんでした',
+      alreadyBusy: true,
+      keepBusyOnSuccess: true,
+      action: () =>
+          ref.read(accountStatusProvider.notifier).register(LoginMethod.google),
+    );
+    if (!registered || !mounted) return;
+    await _run<SubscriptionStatus>(
+      errorTitle: 'ご購入を完了できませんでした',
+      alreadyBusy: true,
+      action: () => ref.read(subscriptionStatusProvider.notifier).purchase(),
+      onDone: (status) => status.isActive
+          ? _showInfo('ご購入ありがとうございます', 'プランをご利用いただけます。')
+          : Future<void>.value(),
+    );
+  }
+
+  /// 登録済みの方の、「Googleでログイン」(Issue #153)。確認のあとに、Googleのアカウントを
+  /// 選んで、そのアカウントに切り替える。いまのゲストの履歴・お気に入りは、使えなくなる。
+  ///
+  /// ログインできたら、新しいアカウントの、購読の状態を、読み直す。**すでに購読中なら、購入には
+  /// 進まず**、「ご利用中のプランです」を出す。購読していなければ、「…で購入する」が出る。
+  Future<void> _signIn() async {
+    if (_isBusy) return;
+    final confirmed = await showLoginConfirmDialog(context);
+    if (!confirmed || !mounted) return;
+    final signedIn = await _run<void>(
+      errorTitle: 'ログインできませんでした',
+      action: () =>
+          ref.read(accountStatusProvider.notifier).signIn(LoginMethod.google),
+    );
+    if (!signedIn || !mounted) return;
+    var isSubscribed = false;
+    try {
+      // アカウントが変わったので、取り直しが走っている。読み終わるのを待つ。
+      isSubscribed = (await ref.read(
+        subscriptionStatusProvider.future,
+      )).isActive;
+    } catch (_) {
+      // 読み込めなくても、ログインは済んでいる。画面の、読み直しの案内に任せる。
+    }
+    if (isSubscribed && mounted) {
+      await _showInfo('ログインしました', 'ご利用中のプランが、引き継がれました。');
+    }
+  }
+
+  /// 登録・購入・復元の、共通の流れ。処理中は、ボタンを押せなくし、失敗は、ダイアログで
+  /// 知らせる(取りやめたときは、何も出さない)。うまくいったとき(取りやめでも、失敗でも
+  /// ないとき)は、trueを返す。
+  ///
+  /// - [alreadyBusy]: 呼び出し元が、すでに、処理中にしている(登録から購入まで、続けて
+  ///   処理中にするため)。
+  /// - [keepBusyOnSuccess]: うまくいっても、処理中のままにする(次の処理が、続くため)。
+  Future<bool> _run<T>({
+    required String errorTitle,
+    required Future<T> Function() action,
+    Future<void> Function(T result)? onDone,
+    bool alreadyBusy = false,
+    bool keepBusyOnSuccess = false,
+  }) async {
+    if (!alreadyBusy) {
+      if (_isBusy) return false;
+      setState(() => _isBusy = true);
+    }
+    T? result;
+    var succeeded = false;
     String? errorMessage;
     try {
-      status = await action();
+      result = await action();
+      succeeded = true;
     } on PurchaseCancelledException {
       // 利用者が取りやめただけなので、何も出さない。
+    } on AccountCancelledException {
+      // 利用者が、Googleのアカウントの選択を、取りやめただけなので、何も出さない。
     } on PurchaseException catch (e) {
+      errorMessage = e.message;
+    } on AccountException catch (e) {
       errorMessage = e.message;
     } catch (_) {
       errorMessage = '時間をおいて、もう一度お試しください。';
     }
-    if (!mounted) return;
+    if (!mounted) return false;
+    if (succeeded && keepBusyOnSuccess) return true;
     // ダイアログの裏で、進行中の表示が回り続けないよう、処理中の状態を先に戻す。
     // ダイアログは画面全体を覆うので、この間に、もう一度押されることはない。
     setState(() => _isBusy = false);
     if (errorMessage != null) {
       await _showInfo(errorTitle, errorMessage);
-    } else if (status != null) {
-      await onDone(status);
+    } else if (succeeded && onDone != null) {
+      await onDone(result as T);
     }
+    return succeeded;
   }
 
   /// Google Playの「定期購入」の画面を開く(解約・支払い方法の変更のため)。
@@ -191,7 +272,11 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
                     onManage: _manageSubscription,
                   )
                 else if (!hasAccount)
-                  const _NeedsAccountBody()
+                  _RegisterAndPurchaseBody(
+                    isBusy: _isBusy,
+                    onPressed: _registerAndPurchase,
+                    onSignIn: _signIn,
+                  )
                 else
                   _PurchaseBody(
                     offer: offer,
@@ -316,22 +401,54 @@ class _PurchaseBody extends StatelessWidget {
   }
 }
 
-/// アカウントが未登録のとき。購入は、アカウントに紐づけるため、先に登録してもらう。
-class _NeedsAccountBody extends StatelessWidget {
-  const _NeedsAccountBody();
+/// アカウントが未登録のとき。購入は、アカウントに紐づけるため、登録が必要。画面を行き来
+/// せずに済むよう、「登録して購入する」の、1つのボタンにする(Issue #151)。
+class _RegisterAndPurchaseBody extends StatelessWidget {
+  const _RegisterAndPurchaseBody({
+    required this.isBusy,
+    required this.onPressed,
+    required this.onSignIn,
+  });
+
+  final bool isBusy;
+  final VoidCallback onPressed;
+
+  /// 登録済みの方の、ログイン(登録して購入する、とは、別のまとまり)。
+  final VoidCallback onSignIn;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _BodyText('ご購入には、アカウントの登録が必要です。'),
+        // 登録と、ログインは、別のまとまりにして、間を、大きくあける(押し間違い・
+        // 意味の混同を防ぐ)。
+        const AuthSectionHeading('はじめての方'),
+        const _BodyText(
+          'ご購入には、アカウントの登録が必要です。'
+          '登録すると、いまの履歴とお気に入りを、そのまま引き継げます。',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        ElevatedButton(
+          onPressed: isBusy ? null : onPressed,
+          child: isBusy
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text('${LoginMethod.google.label}で登録して購入する'),
+        ),
+        const OrDivider(),
+        const AuthSectionHeading('すでに登録済みの方'),
+        const _BodyText(
+          'ログインすると、以前の履歴・お気に入り・購読が、戻ります。\n'
+          'いまのゲストの履歴とお気に入りは、引き継がれません。',
+        ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton(
-          onPressed: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const AccountPage())),
-          child: const Text('アカウントを登録する'),
+          onPressed: isBusy ? null : onSignIn,
+          child: Text('${LoginMethod.google.label}でログイン'),
         ),
       ],
     );
