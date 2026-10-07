@@ -80,6 +80,10 @@ export function monthKeyOf(now: Date): string {
  * 購読中か。`subscriptionStatus`が`active`で、期限(`subscriptionExpiresAt`)が
  * あれば、まだ過ぎていないとき。期限がないときは、状態だけで判断する。
  * 解約しても、期限が切れるまでは、購読中として扱う。
+ *
+ * 更新の通知は、期限を過ぎてから届くことがある(Test Storeでは約1分半)。そのあいだに、
+ * 購読中の利用者が、上限の画面にならないよう、期限から`SUBSCRIPTION_GRACE_MS`までは、
+ * 購読中として扱う。
  */
 export function isSubscriptionActive(
   data: FirebaseFirestore.DocumentData | undefined,
@@ -87,8 +91,11 @@ export function isSubscriptionActive(
 ): boolean {
   if (data?.subscriptionStatus !== "active") return false;
   const expiresAt = toMillis(data?.subscriptionExpiresAt);
-  return expiresAt === undefined || expiresAt > now.getTime();
+  return expiresAt === undefined || expiresAt + SUBSCRIPTION_GRACE_MS > now.getTime();
 }
+
+/** 期限を過ぎたあとも、更新の通知を待つ猶予(6時間) */
+export const SUBSCRIPTION_GRACE_MS = 6 * 60 * 60 * 1000;
 
 /** ユーザーのドキュメントの値を、判断に使う利用状況にする(月が変われば、月の回数は0) */
 export function readUserUsage(
