@@ -152,16 +152,52 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
           ),
         );
       },
-      data: (candidates) => Column(
-        children: [
-          Expanded(
-            child: _CandidateListView(
-              candidates: candidates,
-              arrivalStation: result.arrivalStation,
+      data: (candidates) {
+        // 周辺に施設がなく、候補が0件のときは、空のリストではなく、案内を出す。
+        if (candidates.isEmpty) return const _NoCandidatesView();
+        return Column(
+          children: [
+            Expanded(
+              child: _CandidateListView(
+                candidates: candidates,
+                arrivalStation: result.arrivalStation,
+              ),
             ),
-          ),
-          if (category == CandidateCategory.gourmet) const _HotPepperCredit(),
-        ],
+            if (category == CandidateCategory.gourmet) const _HotPepperCredit(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 候補が0件のときの案内(Issue #180)。ガチャの画面へ戻って、別の駅を引き直せる。
+class _NoCandidatesView extends StatelessWidget {
+  const _NoCandidatesView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'この駅の周辺では、候補が見つかりませんでした。\nもう一度ガチャを引いてみてください。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: AppFontSizes.bodyMedium,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              child: const Text('ガチャに戻る'),
+            ),
+          ],
+        ),
       ),
     );
   }
