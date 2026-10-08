@@ -12,6 +12,7 @@ import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/favorite.dart';
 import '../../../domain/entities/station.dart';
 import '../../providers/favorite_providers.dart';
+import '../../widgets/ai_label.dart';
 import '../../widgets/pixel_icon.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
@@ -108,6 +109,9 @@ class CandidateDetailPage extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
+            // キャッチコピーとおすすめ理由は、AIが作った文章。店舗情報と区別する。
+            const Align(alignment: Alignment.centerLeft, child: AiLabel()),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               candidate.catchCopy,
               style: const TextStyle(
@@ -538,7 +542,7 @@ class _HotPepperCredit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Text(
-      '情報提供: ホットペッパーグルメ',
+      '店舗情報: ホットペッパーグルメ',
       style: TextStyle(
         color: AppColors.textSecondary,
         fontSize: AppFontSizes.caption,

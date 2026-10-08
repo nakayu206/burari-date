@@ -10,6 +10,7 @@ import '../../../domain/entities/station.dart';
 import '../../../domain/repositories/candidate_repository.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/candidate_providers.dart';
+import '../../widgets/ai_label.dart';
 import '../../widgets/pixel_icon.dart';
 import 'candidate_detail_page.dart';
 import 'limit_reached_view.dart';
@@ -175,7 +176,7 @@ class _HotPepperCredit extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Text(
-        '情報提供: ホットペッパーグルメ',
+        '店舗情報: ホットペッパーグルメ',
         style: TextStyle(
           color: AppColors.textSecondary,
           fontSize: AppFontSizes.caption,
@@ -250,6 +251,9 @@ class _CandidateListView extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      // キャッチコピーは、AIが作った文章。店舗情報と区別する。
+                      const AiLabel(),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         candidate.catchCopy,
