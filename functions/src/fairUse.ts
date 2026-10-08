@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 /**
@@ -279,6 +279,10 @@ export function removeCategory(recorded: string[] | undefined, category: string)
  * - `reservationCharged`: 今回の呼び出しで回数を消費したか。
  * - `gachaCharged`: ガチャの記録が、回数を消費済みか(記録がなければundefined)。
  * - `isRefetch`: 今回の消費が、取得済みのカテゴリの取り直しによる、追加の消費か。
+ * - `categorySucceeded`: そのカテゴリを、すでに、取得に成功したか。取り直しが失敗した
+ *   とき、成功済みなら、取得済みの記録を残す。成功していなければ(最初の取得が処理中・失敗で、
+ *   取り直しも失敗)、記録も消す。残すと、別のカテゴリの取得が、利用上限に達していても、
+ *   消費なしで通ってしまう。
  * - `isSuperseded`: 同じカテゴリで、あとから、別の呼び出し(取り直し)が、ガチャの記録を
  *   引き継いでいるか。その場合、遅れて失敗した今回の呼び出しは、ガチャの記録を消さず、
  *   今回消費した分だけを戻す(あとの呼び出しが成功していれば、その記録が、消えてしまい、
@@ -291,12 +295,16 @@ export function planRelease(
   category: string,
   isRefetch = false,
   isSuperseded = false,
+  categorySucceeded = false,
 ): { refund: boolean; remaining: string[] } {
   if (isSuperseded) {
     return { refund: reservationCharged, remaining: recorded ?? [] };
   }
   if (isRefetch && reservationCharged) {
-    return { refund: true, remaining: recorded ?? [] };
+    return {
+      refund: true,
+      remaining: categorySucceeded ? (recorded ?? []) : removeCategory(recorded, category),
+    };
   }
   const remaining = removeCategory(recorded, category);
   if (remaining.length > 0) return { refund: false, remaining };
@@ -373,6 +381,8 @@ export async function reserveUsage(
         categories: addCategory(recorded, category),
         // カテゴリごとに、最後に枠を確保した呼び出しを記録する(遅れて失敗した、前の呼び出しが、
         // あとの呼び出しの記録を消さないように)。
+        // 取得に成功したカテゴリ(markCategorySucceededで記録する)。引き継ぐ。
+        categorySucceeded: (existing?.categorySucceeded as string[] | undefined) ?? [],
         categoryOwners: {
           ...((existing?.categoryOwners as Record<string, string> | undefined) ?? {}),
           [category]: requestId,
@@ -393,6 +403,29 @@ export async function reserveUsage(
       requestId,
     };
   });
+}
+
+/**
+ * そのカテゴリの取得に成功したことを、ガチャの記録に残す。あとの取り直しが失敗しても、
+ * 成功済みのカテゴリの記録を消さないために使う。記録がない(ほかの呼び出しが消した)
+ * ときや、失敗したときは、何もしない(取得自体は成功しているため、失敗にしない)。
+ */
+export async function markCategorySucceeded(
+  uid: string,
+  gachaId: string | undefined,
+  category: string,
+): Promise<void> {
+  if (!gachaId) return;
+  try {
+    await getFirestore()
+      .collection("users")
+      .doc(uid)
+      .collection("gachaUsage")
+      .doc(gachaId)
+      .update({ categorySucceeded: FieldValue.arrayUnion(category) });
+  } catch (e) {
+    console.warn("取得の成功を記録できませんでした", e);
+  }
 }
 
 /**
@@ -431,6 +464,9 @@ export async function releaseUsage(
       gachaSnap?.data()?.categoryOwners as Record<string, string> | undefined
     )?.[category];
     const isSuperseded = owner !== undefined && owner !== reservation.requestId;
+    const categorySucceeded =
+      (gachaSnap?.data()?.categorySucceeded as string[] | undefined)?.includes(category) ===
+      true;
 
     const { refund, remaining } = planRelease(
       reservation.charged,
@@ -439,6 +475,7 @@ export async function releaseUsage(
       category,
       reservation.isRefetch,
       isSuperseded,
+      categorySucceeded,
     );
 
     if (refund) {
