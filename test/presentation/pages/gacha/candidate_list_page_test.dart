@@ -102,6 +102,42 @@ void main() {
       expect(find.text('店舗情報: ホットペッパーグルメ'), findsOneWidget);
     });
 
+    testWidgets('候補が0件のときは、空のリストではなく、案内と「ガチャに戻る」を出す', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [candidatesProvider.overrideWith((ref, args) async => [])],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CandidateListPage(result: result),
+                    ),
+                  ),
+                  child: const Text('開く'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開く'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('候補が見つかりませんでした'), findsOneWidget);
+      // 候補がないので、クレジットは出さない。
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsNothing);
+      expect(find.byType(CandidateListPage), findsOneWidget);
+
+      await tester.tap(find.text('ガチャに戻る'));
+      await tester.pumpAndSettle();
+
+      // ガチャの画面(前の画面)に戻る。
+      expect(find.byType(CandidateListPage), findsNothing);
+      expect(find.text('開く'), findsOneWidget);
+    });
+
     testWidgets('AIが作ったキャッチコピーには「AI紹介」を付け、店名・クレジットには付けない', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
