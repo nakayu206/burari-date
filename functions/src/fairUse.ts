@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
@@ -136,6 +138,11 @@ export interface Reservation {
   isRefetch: boolean;
   /** 枠を確保した月(日本時間のYYYYMM)。月をまたいで失敗したときに、戻す月を照合する */
   monthKey: string;
+  /**
+   * この呼び出しを区別するID。同じカテゴリの取り直しなど、別の呼び出しが、ガチャの
+   * 記録を引き継いだあとに、遅れて失敗した呼び出しが、その記録を消さないようにする。
+   */
+  requestId: string;
 }
 
 /**
@@ -272,6 +279,10 @@ export function removeCategory(recorded: string[] | undefined, category: string)
  * - `reservationCharged`: 今回の呼び出しで回数を消費したか。
  * - `gachaCharged`: ガチャの記録が、回数を消費済みか(記録がなければundefined)。
  * - `isRefetch`: 今回の消費が、取得済みのカテゴリの取り直しによる、追加の消費か。
+ * - `isSuperseded`: 同じカテゴリで、あとから、別の呼び出し(取り直し)が、ガチャの記録を
+ *   引き継いでいるか。その場合、遅れて失敗した今回の呼び出しは、ガチャの記録を消さず、
+ *   今回消費した分だけを戻す(あとの呼び出しが成功していれば、その記録が、消えてしまい、
+ *   別のカテゴリの取得で、また消費してしまうため)。
  */
 export function planRelease(
   reservationCharged: boolean,
@@ -279,7 +290,11 @@ export function planRelease(
   recorded: string[] | undefined,
   category: string,
   isRefetch = false,
+  isSuperseded = false,
 ): { refund: boolean; remaining: string[] } {
+  if (isSuperseded) {
+    return { refund: reservationCharged, remaining: recorded ?? [] };
+  }
   if (isRefetch && reservationCharged) {
     return { refund: true, remaining: recorded ?? [] };
   }
@@ -313,6 +328,7 @@ export async function reserveUsage(
   const gachaRef = gachaId
     ? userRef.collection("gachaUsage").doc(gachaId)
     : undefined;
+  const requestId = randomUUID();
 
   return db.runTransaction(async (tx) => {
     const userSnap = await tx.get(userRef);
@@ -355,6 +371,12 @@ export async function reserveUsage(
           : undefined;
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
+        // カテゴリごとに、最後に枠を確保した呼び出しを記録する(遅れて失敗した、前の呼び出しが、
+        // あとの呼び出しの記録を消さないように)。
+        categoryOwners: {
+          ...((existing?.categoryOwners as Record<string, string> | undefined) ?? {}),
+          [category]: requestId,
+        },
         charged: alreadyCharged || source !== undefined,
         ...(chargedSource ? { chargedSource } : {}),
         ...(chargedMonthKey ? { chargedMonthKey } : {}),
@@ -368,6 +390,7 @@ export async function reserveUsage(
       // 取得済みのカテゴリの取り直しで、追加で消費したか。
       isRefetch: source !== undefined && recorded?.includes(category) === true,
       monthKey: monthKeyOf(now),
+      requestId,
     };
   });
 }
@@ -403,12 +426,19 @@ export async function releaseUsage(
       ? ((gachaSnap.data()?.charged as boolean | undefined) ?? true)
       : undefined;
 
+    // 同じカテゴリで、あとから、別の呼び出し(取り直し)が、枠を確保していたか。
+    const owner = (
+      gachaSnap?.data()?.categoryOwners as Record<string, string> | undefined
+    )?.[category];
+    const isSuperseded = owner !== undefined && owner !== reservation.requestId;
+
     const { refund, remaining } = planRelease(
       reservation.charged,
       gachaCharged,
       recorded,
       category,
       reservation.isRefetch,
+      isSuperseded,
     );
 
     if (refund) {

@@ -341,6 +341,24 @@ test("ガチャの最初の消費(取り直しではない)は、これまでど
   assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false).refund, true);
 });
 
+test("遅れて失敗した呼び出しは、あとの呼び出しが引き継いだ記録を消さず、自分が消費した分だけ戻す", () => {
+  // 取得A開始 → 再試行B成功(Bが記録を引き継ぐ) → Aが失敗。
+  const plan = planRelease(true, true, ["gourmet"], "gourmet", false, true);
+  assert.equal(plan.refund, true, "Aが消費した1回は、戻す");
+  assert.deepEqual(plan.remaining, ["gourmet"], "Bが成功した記録は、消さない");
+});
+
+test("遅れて失敗しても、自分が消費していなければ、何も戻さない", () => {
+  const plan = planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing", false, true);
+  assert.equal(plan.refund, false);
+  assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"]);
+});
+
+test("あとの呼び出しがなければ(自分が最後の持ち主)、これまでどおり", () => {
+  assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false, false).refund, true);
+  assert.deepEqual(planRelease(true, true, ["gourmet"], "gourmet", false, false).remaining, []);
+});
+
 test("消費していない呼び出しは、取り直し扱いにしない", () => {
   // 別カテゴリで、消費しなかった呼び出し(isRefetchはfalse)。
   assert.equal(planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing", false).refund, false);
