@@ -27,12 +27,16 @@ final candidatesProvider = FutureProvider.autoDispose
       try {
         final repository = ref.watch(candidateRepositoryProvider);
         final preference = await _loadSavedPreference(ref);
-        return await repository.getCandidates(
+        final candidates = await repository.getCandidates(
           args.result.arrivalStation,
           args.category,
           gachaId: gachaIdOf(args.result),
           preference: preference,
         );
+        // 0件のときは、利用枠も消費していない(取り直せる)。保持すると、開き直しても、
+        // 空のままになるため、保持しない。
+        if (candidates.isEmpty) link.close();
+        return candidates;
       } catch (_) {
         link.close();
         rethrow;

@@ -14,8 +14,20 @@ import 'package:burari_date/domain/repositories/settings_repository.dart';
 import 'package:burari_date/presentation/providers/candidate_providers.dart';
 import 'package:burari_date/presentation/providers/settings_providers.dart';
 
-/// 渡された好み設定を記録するだけのリポジトリ。
+const _sampleCandidate = Candidate(
+  id: 'c1',
+  category: CandidateCategory.gourmet,
+  name: 'テスト食堂',
+  catchCopy: 'キャッチコピー',
+  reason: 'おすすめ理由',
+  walkMinutes: 3,
+);
+
+/// 渡された好み設定を記録するだけのリポジトリ。[response]を返す(既定は候補1件)。
 class _RecordingCandidateRepository implements CandidateRepository {
+  _RecordingCandidateRepository({this.response = const [_sampleCandidate]});
+
+  final List<Candidate> response;
   AiPreference? receivedPreference;
   final receivedGachaIds = <String>[];
   int callCount = 0;
@@ -30,7 +42,7 @@ class _RecordingCandidateRepository implements CandidateRepository {
     callCount++;
     receivedGachaIds.add(gachaId);
     receivedPreference = preference;
-    return const [];
+    return response;
   }
 }
 
@@ -143,6 +155,25 @@ void main() {
     reopened.close();
 
     expect(repository.callCount, 1);
+  });
+
+  test('候補が0件のときは、結果を保持せず、開き直したときに取り直す', () async {
+    final repository = _RecordingCandidateRepository(response: const []);
+    final container = ProviderContainer(
+      overrides: [candidateRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final first = container.listen(candidatesProvider(args), (_, _) {});
+    expect(await container.read(candidatesProvider(args).future), isEmpty);
+    first.close();
+    await Future<void>.delayed(Duration.zero);
+
+    final second = container.listen(candidatesProvider(args), (_, _) {});
+    await container.read(candidatesProvider(args).future);
+    second.close();
+
+    expect(repository.callCount, 2);
   });
 
   test('同じガチャ結果のグルメ・観光は同じgachaId、別のガチャは別のgachaIdを渡す', () async {

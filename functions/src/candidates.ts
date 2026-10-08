@@ -100,6 +100,12 @@ export const getCandidates = onCall<GetCandidatesRequest>(
             : 5,
       }));
 
+      // 周辺に施設がなく、候補が0件のときは、利用枠を消費しない(利用者に、何も提供して
+      // いないため)。0件の結果は、成功として返す。
+      if (candidates.length === 0) {
+        await releaseUsage(uid, reservation, category, gachaId, undefined, deviceId);
+      }
+
       return { candidates };
     } catch (e) {
       await releaseUsage(uid, reservation, category, gachaId, undefined, deviceId);
