@@ -2,7 +2,13 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { anthropicApiKey, generateCandidates } from "./ai";
 import { estimateWalkMinutes } from "./distance";
-import { isValidDeviceId, isValidGachaId, releaseUsage, reserveUsage } from "./fairUse";
+import {
+  isValidDeviceId,
+  isValidGachaId,
+  markCategorySucceeded,
+  releaseUsage,
+  reserveUsage,
+} from "./fairUse";
 import { hotpepperApiKey, searchGourmet } from "./gourmet";
 import { parsePreference, prioritizeByGenres } from "./preference";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
@@ -104,6 +110,9 @@ export const getCandidates = onCall<GetCandidatesRequest>(
       // いないため)。0件の結果は、成功として返す。
       if (candidates.length === 0) {
         await releaseUsage(uid, reservation, category, gachaId, undefined, deviceId);
+      } else {
+        // 取得に成功したことを記録する(あとの取り直しが失敗しても、記録を消さないため)。
+        await markCategorySucceeded(uid, gachaId, category);
       }
 
       return { candidates };

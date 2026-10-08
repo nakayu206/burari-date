@@ -321,9 +321,9 @@ test("gachaIdなし(記録なし)では、今回数えた分だけを戻す", ()
   assert.equal(planRelease(false, undefined, undefined, "gourmet").refund, false);
 });
 
-test("取得済みのカテゴリの取り直しが失敗したら、追加で消費した1回を戻し、カテゴリの記録は残す", () => {
+test("取得に成功済みのカテゴリの取り直しが失敗したら、追加で消費した1回を戻し、カテゴリの記録は残す", () => {
   // グルメ・観光を取得済みで、グルメを取り直して(追加で1回消費)失敗した。
-  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true);
+  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, true);
   assert.equal(plan.refund, true);
   assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"], "取得済みのカテゴリは、消さない");
 });
@@ -331,7 +331,7 @@ test("取得済みのカテゴリの取り直しが失敗したら、追加で�
 test("取り直しの失敗で戻すのは、追加の1回だけ(ガチャの最初の消費は、戻さない)", () => {
   // 取り直しが失敗しても、記録は残るので、そのあとで、もう一方の取り直しが失敗しても、
   // 最初の消費は、全カテゴリが失敗するまで、戻らない。
-  const first = planRelease(true, true, ["gourmet"], "gourmet", true);
+  const first = planRelease(true, true, ["gourmet"], "gourmet", true, false, true);
   assert.equal(first.refund, true);
   assert.deepEqual(first.remaining, ["gourmet"]);
 });
@@ -357,6 +357,24 @@ test("遅れて失敗しても、自分が消費していなければ、何も�
 test("あとの呼び出しがなければ(自分が最後の持ち主)、これまでどおり", () => {
   assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false, false).refund, true);
   assert.deepEqual(planRelease(true, true, ["gourmet"], "gourmet", false, false).remaining, []);
+});
+
+test("取り直しが失敗して、そのカテゴリが、成功済みでなければ、取得済みの記録も消す(重なって両方失敗)", () => {
+  // A→Bの順に失敗: Aは返却のみ、Bは返却し、記録も消す。別のカテゴリが、消費なしで通る隙間を残さない。
+  const plan = planRelease(true, true, ["gourmet"], "gourmet", true, false, false);
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, [], "成功していないので、記録は消す");
+});
+
+test("取り直しが失敗しても、そのカテゴリが、成功済みなら、取得済みの記録は残す", () => {
+  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, true);
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"]);
+});
+
+test("取り直しが失敗して、成功済みでなくても、ほかのカテゴリの記録は残す", () => {
+  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, false);
+  assert.deepEqual(plan.remaining, ["sightseeing"]);
 });
 
 test("消費していない呼び出しは、取り直し扱いにしない", () => {
