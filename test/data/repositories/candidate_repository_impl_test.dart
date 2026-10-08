@@ -18,6 +18,13 @@ void main() {
       longitude: 139.70,
     );
 
+    test('待ち時間は、バックエンド(120秒)より長い(先にアプリが失敗にしない)', () {
+      expect(
+        CandidateRepositoryImpl.callTimeout,
+        greaterThan(const Duration(seconds: 120)),
+      );
+    });
+
     test('呼び出しの前にログインを確かめ、失敗したら、取得せずにエラーにする', () async {
       var called = false;
       final repository = CandidateRepositoryImpl(

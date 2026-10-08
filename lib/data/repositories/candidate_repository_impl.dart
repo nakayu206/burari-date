@@ -53,10 +53,19 @@ class CandidateRepositoryImpl implements CandidateRepository {
 
   static Future<String?> _noDeviceId() async => null;
 
+  /// 候補の取得を待つ時間。バックエンドの`getCandidates`の待ち時間(120秒。
+  /// `functions/src/candidates.ts`の`timeoutSeconds`)より、少し長くする。短いと、
+  /// アプリが先に失敗と見なし、サーバー側は成功して利用枠を消費したのに、画面は失敗に
+  /// なり、取り直しで、また消費してしまう(Issue #181)。
+  static const callTimeout = Duration(seconds: 130);
+
   static Future<Map<String, dynamic>> _defaultCallable(
     Map<String, dynamic> data,
   ) async {
-    final callable = FirebaseFunctions.instance.httpsCallable('getCandidates');
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'getCandidates',
+      options: HttpsCallableOptions(timeout: callTimeout),
+    );
     final result = await callable.call<Map<String, dynamic>>(data);
     return result.data;
   }
