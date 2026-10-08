@@ -1,7 +1,8 @@
 name: CI
 
 # 何をする？
-#   PR と main への push のたびに、フォーマット・静的解析・テストを自動実行する。
+#   PR と main への push のたびに、フォーマット・静的解析・テスト(アプリとバックエンド)を
+#   自動実行する。
 #   壊れたコードが main に入るのを防ぐのが目的。
 #
 # テスト方針
@@ -46,3 +47,21 @@ jobs:
       # 6. 単体テスト
       - name: Run unit tests
         run: flutter test --reporter expanded
+
+      # 7. バックエンド(Cloud Functions)のビルドとテスト。利用枠の判断や購読の状態など、
+      #    課金に関わるロジックが入っているため、PRのたびに確かめる。
+      #    Node.jsは、functions/package.json の engines に合わせる。
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Build and test functions
+        working-directory: functions
+        run: npm test
