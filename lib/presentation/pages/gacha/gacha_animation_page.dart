@@ -551,18 +551,20 @@ class _SkyPalette {
     switch (band) {
       case _TimeBand.morning:
         return const _SkyPalette(
+          // 朝は、澄んだ、白っぽい水色の空。地平線の近くだけ、ほんのり淡いピンク〜
+          // クリーム色にする。オレンジだと、夕方と見分けがつかないため(Issue #175)。
           gradientColors: [
-            Color(0xFFF6C89F),
-            Color(0xFFF7D9B0),
-            Color(0xFFEFE3C0),
+            Color(0xFFB4D8EC),
+            Color(0xFFCDE5F0),
+            Color(0xFFF3E6DC),
             AppColors.background,
             Color(0xFFDCC99A),
           ],
-          gradientStops: [0.0, 0.28, 0.5, 0.68, 1.0],
-          celestialColor: Color(0xFFFFE29A),
-          celestialGlow: Color(0xFFFFE29A),
+          gradientStops: [0.0, 0.3, 0.55, 0.68, 1.0],
+          celestialColor: Color(0xFFFFF3C4),
+          celestialGlow: Color(0xFFFFF3C4),
           isMoon: false,
-          hillColor: Color(0xFFB7C08A),
+          hillColor: Color(0xFFB9CC9B),
           cloudColor: Colors.white,
           showStars: false,
         );
