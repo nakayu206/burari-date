@@ -39,6 +39,24 @@ class Favorite {
     );
   }
 
+  /// 保存した内容から、候補を作る。お気に入りから候補の詳細を開くために使う(Issue #182)。
+  Candidate toCandidate() {
+    return Candidate(
+      id: candidateId,
+      category: category,
+      name: name,
+      catchCopy: catchCopy,
+      reason: reason,
+      walkMinutes: walkMinutes,
+      address: address,
+      imageUrl: imageUrl,
+      latitude: latitude,
+      longitude: longitude,
+      categoryName: categoryName,
+      budget: budget,
+    );
+  }
+
   factory Favorite.fromJson(Map<String, dynamic> json) {
     return Favorite(
       candidateId: json['candidateId'] as String,

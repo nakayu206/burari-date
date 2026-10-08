@@ -8,6 +8,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../domain/entities/favorite.dart';
 import '../../providers/favorite_providers.dart';
 import '../../widgets/pixel_icon.dart';
+import '../gacha/candidate_detail_page.dart';
 
 /// お気に入り一覧画面。S-06で保存した候補を新しい順に表示する(仕様書 6.1 Favorite)。
 class FavoriteListPage extends ConsumerWidget {
@@ -69,46 +70,59 @@ class _FavoriteRow extends ConsumerWidget {
     container.invalidate(isFavoriteProvider(favorite.candidateId));
   }
 
+  /// 保存した内容から、候補の詳細を開く(地図・経路案内も使える)。
+  void _openDetail(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CandidateDetailPage(candidate: favorite.toCandidate()),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GenreIcon(
-          category: favorite.category,
-          categoryName: favorite.categoryName,
-          size: 36,
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                favorite.name,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: AppFontSizes.bodyMedium,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                favorite.catchCopy,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: AppFontSizes.caption,
-                ),
-              ),
-            ],
+    return InkWell(
+      onTap: () => _openDetail(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GenreIcon(
+            category: favorite.category,
+            categoryName: favorite.categoryName,
+            size: 36,
           ),
-        ),
-        IconButton(
-          onPressed: () => _remove(context, ref),
-          icon: const Icon(Icons.delete_outline_rounded),
-          color: AppColors.textSecondary,
-          tooltip: 'お気に入りから削除',
-        ),
-      ],
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  favorite.name,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: AppFontSizes.bodyMedium,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  favorite.catchCopy,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: AppFontSizes.caption,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _remove(context, ref),
+            icon: const Icon(Icons.delete_outline_rounded),
+            color: AppColors.textSecondary,
+            tooltip: 'お気に入りから削除',
+          ),
+        ],
+      ),
     );
   }
 }

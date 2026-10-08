@@ -9,6 +9,7 @@ import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/favorite.dart';
 import 'package:burari_date/domain/repositories/favorite_repository.dart';
 import 'package:burari_date/presentation/pages/favorite/favorite_list_page.dart';
+import 'package:burari_date/presentation/pages/gacha/candidate_detail_page.dart';
 import 'package:burari_date/presentation/providers/favorite_providers.dart';
 
 /// 削除失敗時にエラー表示になることを検証するためのフェイク。
@@ -81,6 +82,84 @@ void main() {
       expect(find.text('キャッチコピー1'), findsOneWidget);
       expect(find.text('テスト公園'), findsOneWidget);
       expect(find.text('キャッチコピー2'), findsOneWidget);
+    });
+
+    testWidgets('行をタップすると、保存した内容で、候補の詳細を開く', (tester) async {
+      final favorites = [
+        Favorite(
+          candidateId: 'c1',
+          category: CandidateCategory.gourmet,
+          name: 'テスト洋食屋',
+          catchCopy: 'キャッチコピー1',
+          reason: 'おすすめ理由1',
+          walkMinutes: 3,
+          savedAt: DateTime(2026, 9, 18),
+          address: '東京都テスト区1-2-3',
+          budget: '1000円',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) async => favorites),
+            favoriteRepositoryProvider.overrideWithValue(
+              FavoriteRepositoryImpl(
+                dataSource: FavoriteFirestoreDataSource(
+                  firestore: FakeFirebaseFirestore(),
+                  uid: 'test-uid',
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: FavoriteListPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('テスト洋食屋'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CandidateDetailPage), findsOneWidget);
+      // 保存した、おすすめ理由・住所・予算が、詳細に出る。
+      expect(find.text('おすすめ理由1'), findsOneWidget);
+      expect(find.textContaining('東京都テスト区1-2-3'), findsOneWidget);
+      expect(find.textContaining('1000円'), findsOneWidget);
+    });
+
+    testWidgets('削除アイコンをタップしても、詳細は開かず、お気に入りから消える', (tester) async {
+      final favoriteRepository = FavoriteRepositoryImpl(
+        dataSource: FavoriteFirestoreDataSource(
+          firestore: FakeFirebaseFirestore(),
+          uid: 'test-uid',
+        ),
+      );
+      await favoriteRepository.addFavorite(
+        Favorite(
+          candidateId: 'c9',
+          category: CandidateCategory.gourmet,
+          name: '消す店',
+          catchCopy: 'キャッチコピー',
+          reason: 'おすすめ理由',
+          walkMinutes: 3,
+          savedAt: DateTime(2026, 9, 18),
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoriteRepositoryProvider.overrideWithValue(favoriteRepository),
+          ],
+          child: const MaterialApp(home: FavoriteListPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CandidateDetailPage), findsNothing);
+      expect(find.text('消す店'), findsNothing);
     });
 
     testWidgets('削除アイコンをタップするとお気に入りから消える', (tester) async {
