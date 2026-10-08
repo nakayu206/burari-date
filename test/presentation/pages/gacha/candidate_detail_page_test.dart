@@ -620,7 +620,50 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('情報提供: ホットペッパーグルメ'), findsOneWidget);
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsOneWidget);
+    });
+
+    testWidgets('キャッチコピーとおすすめ理由の上に「AI紹介」を付ける(観光でも付く)', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
+            home: CandidateDetailPage(candidate: candidateWithoutLocation),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('AI紹介'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('AI紹介')).dy,
+        lessThan(
+          tester.getTopLeft(find.text(candidateWithoutLocation.catchCopy)).dy,
+        ),
+      );
+    });
+
+    testWidgets('観光候補にも「AI紹介」を付けるが、ホットペッパーのクレジットは付けない', (tester) async {
+      const sightseeing = Candidate(
+        id: 'c5',
+        category: CandidateCategory.sightseeing,
+        name: 'テスト公園',
+        catchCopy: '公園のキャッチコピー',
+        reason: 'おすすめ理由',
+        walkMinutes: 4,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _favoriteOverrides(),
+          child: const MaterialApp(
+            home: CandidateDetailPage(candidate: sightseeing),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('AI紹介'), findsOneWidget);
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsNothing);
     });
 
     testWidgets('観光候補はホットペッパーのクレジットを表示しない', (tester) async {
@@ -643,7 +686,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('情報提供: ホットペッパーグルメ'), findsNothing);
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsNothing);
     });
   });
 }

@@ -99,7 +99,31 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('情報提供: ホットペッパーグルメ'), findsOneWidget);
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsOneWidget);
+    });
+
+    testWidgets('AIが作ったキャッチコピーには「AI紹介」を付け、店名・クレジットには付けない', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith(
+              (ref, args) async => [gourmetCandidate],
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 候補1件につき、1つ(キャッチコピーの上)。
+      expect(find.text('AI紹介'), findsOneWidget);
+      // ラベルは、キャッチコピーの上にある。
+      expect(
+        tester.getTopLeft(find.text('AI紹介')).dy,
+        lessThan(tester.getTopLeft(find.text(gourmetCandidate.catchCopy)).dy),
+      );
+      // クレジットは、店舗情報のものであり、AIの文章とは別の文言。
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsOneWidget);
     });
 
     testWidgets('観光タブにはホットペッパーのクレジットを表示しない', (tester) async {
@@ -119,7 +143,7 @@ void main() {
       await tester.tap(find.text('観光'));
       await tester.pumpAndSettle();
 
-      expect(find.text('情報提供: ホットペッパーグルメ'), findsNothing);
+      expect(find.text('店舗情報: ホットペッパーグルメ'), findsNothing);
     });
 
     testWidgets('タブを切り替えても、一度取得した候補は取り直さない', (tester) async {
