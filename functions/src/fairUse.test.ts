@@ -5,7 +5,11 @@ import {
   addCategory,
   applyCharge,
   applyRefund,
+  addInFlight,
+  hasOtherInFlight,
+  IN_FLIGHT_TTL_MS,
   isRefundableMonth,
+  removeInFlight,
   isSubscriptionActive,
   isValidDeviceId,
   SUBSCRIPTION_GRACE_MS,
@@ -375,6 +379,45 @@ test("取り直しが失敗しても、そのカテゴリが、成功済みな�
 test("取り直しが失敗して、成功済みでなくても、ほかのカテゴリの記録は残す", () => {
   const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, false);
   assert.deepEqual(plan.remaining, ["sightseeing"]);
+});
+
+test("処理中の取得(A)が残っている間に、取り直し(B)が失敗しても、カテゴリの記録は消さず、Bの分だけ戻す", () => {
+  // A開始→B開始→B失敗: Aは処理中なので、記録を消さない。
+  const plan = planRelease(true, true, ["gourmet"], "gourmet", true, true, false);
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, ["gourmet"]);
+});
+
+test("取り直し(B)が成功したあとに、最初の取得(A)が失敗しても、成功した記録は消さず、Aの分だけ戻す", () => {
+  // A開始→B開始→B成功→A失敗: Bが成功を記録済み(処理中の一覧は、Aだけ)。
+  const plan = planRelease(true, true, ["gourmet"], "gourmet", false, false, true);
+  assert.equal(plan.refund, true, "Aが消費した1回は、戻す");
+  assert.deepEqual(plan.remaining, ["gourmet"], "Bの成功の記録は、消さない");
+});
+
+test("処理中の一覧: 追加・取り外し・ほかの処理中の判定", () => {
+  const t0 = 1_000_000;
+  const a = addInFlight(undefined, "A", t0);
+  const ab = addInFlight(a, "B", t0 + 1000);
+  assert.deepEqual(ab.map((e) => e.id), ["A", "B"]);
+
+  // 自分のほかに、処理中があるか。
+  assert.equal(hasOtherInFlight(ab, "B", t0 + 2000), true, "Aが処理中");
+  assert.equal(hasOtherInFlight(removeInFlight(ab, "A"), "B", t0 + 2000), false);
+  assert.equal(hasOtherInFlight(undefined, "B", t0), false);
+
+  // 同じIDは、重ならない。
+  assert.equal(addInFlight(ab, "A", t0 + 3000).filter((e) => e.id === "A").length, 1);
+});
+
+test("処理中の一覧: 期限を過ぎた記録は、無視する(クラッシュで、残り続けないように)", () => {
+  const t0 = 1_000_000;
+  const list = addInFlight(undefined, "A", t0);
+  assert.equal(hasOtherInFlight(list, "B", t0 + IN_FLIGHT_TTL_MS - 1), true);
+  assert.equal(hasOtherInFlight(list, "B", t0 + IN_FLIGHT_TTL_MS), false);
+  // 追加のとき、古いものは取り除く。
+  const next = addInFlight(list, "C", t0 + IN_FLIGHT_TTL_MS + 1);
+  assert.deepEqual(next.map((e) => e.id), ["C"]);
 });
 
 test("消費していない呼び出しは、取り直し扱いにしない", () => {
