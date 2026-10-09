@@ -66,6 +66,11 @@ void main() {
       expect(deletion, contains('履歴'));
       expect(deletion, contains('残ります'));
       expect(deletion, contains('Google Play'));
+      // Google Playの条件: アプリ・デベロッパーの名前と、保持期間を書く。
+      expect(deletion, contains('ぶらりデートガチャ'));
+      expect(deletion, contains('CenterRiverStudio'));
+      expect(deletion, contains('期間を定めずに'));
+      expect(deletion, contains('1か月'));
     });
 
     test('プライバシーポリシーには、お問い合わせで、メールアドレスを取得することを書く', () {
