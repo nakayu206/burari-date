@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
+import { deletedAccountRef } from "./account";
+
 /**
  * 無料で使える累計回数(コスト対策バックストップ、仕様書10章)。
  * 1回は「1回のガチャ」で、そのガチャのグルメ・観光の両方の取得を含む。
@@ -134,8 +136,6 @@ export interface Reservation {
   charged: boolean;
   /** 消費した回数の出どころ(消費していないときはundefined) */
   source?: UsageSource;
-  /** 取得済みのカテゴリの取り直しで、追加で消費したか(失敗したら、その1回だけを戻す) */
-  isRefetch: boolean;
   /** 枠を確保した月(日本時間のYYYYMM)。月をまたいで失敗したときに、戻す月を照合する */
   monthKey: string;
   /**
@@ -305,52 +305,89 @@ export function removeCategory(recorded: string[] | undefined, category: string)
   return (recorded ?? []).filter((c) => c !== category);
 }
 
+/** ガチャが保持している、1回分の消費(どの回数から、どの月に、消費したか) */
+export interface HeldCharge {
+  source: UsageSource;
+  /** 消費した月(日本時間のYYYYMM)。古い記録は、ない */
+  monthKey?: string;
+}
+
 /**
- * 取得に失敗したカテゴリの枠を戻すかどうかを判断する(Firestoreを使わない純粋な関数)。
+ * ガチャの記録から、保持している消費の一覧を読む(Firestoreを使わない純粋な関数)。
+ * 古い記録(`charges`がない)は、消費済みなら、`chargedSource`・`chargedMonthKey`の1回分とみなす
+ * (出どころの記録がないときは、無料枠)。
+ */
+export function readHeldCharges(
+  data: FirebaseFirestore.DocumentData | undefined,
+): HeldCharge[] {
+  if (!data) return [];
+  if (Array.isArray(data.charges)) return data.charges as HeldCharge[];
+  if (data.charged === false) return [];
+  const monthKey = data.chargedMonthKey as string | undefined;
+  return [
+    {
+      source: (data.chargedSource as UsageSource | undefined) ?? "free",
+      ...(monthKey ? { monthKey } : {}),
+    },
+  ];
+}
+
+/**
+ * 保持している消費の一覧から、戻す1回分を取り出す(Firestoreを使わない純粋な関数)。
+ * 今回の呼び出しが消費したもの(`preferred`: 出どころと月が同じもの)を優先し、なければ、
+ * いちばん古いものを取り出す。実際に消費した回数(無料枠・月額枠・月)に、戻すために使う。
+ */
+export function takeCharge(
+  charges: HeldCharge[],
+  preferred?: HeldCharge,
+): { entry: HeldCharge | undefined; rest: HeldCharge[] } {
+  if (charges.length === 0) return { entry: undefined, rest: [] };
+  let index = preferred
+    ? charges.findIndex((c) => c.source === preferred.source && c.monthKey === preferred.monthKey)
+    : -1;
+  if (index < 0) index = 0;
+  return {
+    entry: charges[index],
+    rest: charges.filter((_, i) => i !== index),
+  };
+}
+
+/**
+ * 取得に失敗した呼び出しの枠を、戻すかどうかを判断する(Firestoreを使わない純粋な関数)。
  *
- * グルメ・観光は並行して取得するため、回数を消費した側(最初に確保した側)が
- * 失敗しても、もう一方が成功・取得中なら、そのガチャは使われている。この場合は
- * 枠を戻さず、ガチャの記録に残す。全てのカテゴリが失敗して記録が空になったときに、
- * そのガチャで消費した枠を戻す。
+ * ガチャの記録は、**保持している消費の一覧**(`charges`。1回ごとに、出どころと月)を持つ。
+ * 決まりは、次の2つ。
+ * - ガチャに、カテゴリが残っている(成功・処理中)間は、**最低1回の消費を、保持する**。
+ * - 失敗した呼び出しは、自分の分を戻しても、保持が、必要な回数(カテゴリが残っていれば1)を
+ *   下回らないときだけ、戻す。
  *
- * 取得済みのカテゴリの取り直し(`isRefetch`)は、ガチャの最初の消費とは別に、追加で
- * 1回消費している。その取り直しが失敗したら、追加で消費した1回だけを戻す。ガチャの
- * 記録(取得済みのカテゴリ)は、消さない。
+ * これで、グルメ・観光、取り直しが、どの順番で、成功・失敗しても、成功したカテゴリがある間は、
+ * 消費が1回、残る。取り直しで、追加で消費した分は、保持が、必要な回数を超えているため、
+ * 失敗したら、戻る。
  *
- * - `reservationCharged`: 今回の呼び出しで回数を消費したか。
- * - `gachaCharged`: ガチャの記録が、回数を消費済みか(記録がなければundefined)。
- * - `isRefetch`: 今回の消費が、取得済みのカテゴリの取り直しによる、追加の消費か。
- * - `categorySucceeded`: そのカテゴリを、すでに、取得に成功したか。取り直しが失敗した
- *   とき、成功済みなら、取得済みの記録を残す。成功していなければ(最初の取得が処理中・失敗で、
- *   取り直しも失敗)、記録も消す。残すと、別のカテゴリの取得が、利用上限に達していても、
- *   消費なしで通ってしまう。
- * - `othersInFlight`: 同じカテゴリで、今回のほかに、処理中の取得があるか。ある間は、そのカテゴリの
- *   記録を消さず、今回消費した分だけを戻す(処理中の取得が成功したとき、記録が消えていると、
- *   別のカテゴリの取得で、また消費してしまうため)。
+ * - `reservationCharged`: 今回の呼び出しが、回数を消費したか(別カテゴリは、消費しない)。
+ * - `heldCharges`: ガチャの記録が、いま、保持している消費の回数(今回の分を含む。`charges`の長さ)。
+ * - `categorySucceeded`: そのカテゴリを、すでに、取得に成功したか。成功済みのカテゴリは、
+ *   取り直しが失敗しても、記録を残す。
+ * - `othersInFlight`: 同じカテゴリで、今回のほかに、処理中の取得があるか。ある間は、記録を残す。
+ * - 戻り値の`remaining`: 失敗のあとに、ガチャの記録に残すカテゴリ。
  */
 export function planRelease(
   reservationCharged: boolean,
-  gachaCharged: boolean | undefined,
+  heldCharges: number,
   recorded: string[] | undefined,
   category: string,
-  isRefetch = false,
   othersInFlight = false,
   categorySucceeded = false,
 ): { refund: boolean; remaining: string[] } {
-  // 成功済み、または、ほかに処理中の取得があるカテゴリは、記録を消さない。
   const keepCategory = categorySucceeded || othersInFlight;
-  if (isRefetch && reservationCharged) {
-    return {
-      refund: true,
-      remaining: keepCategory ? (recorded ?? []) : removeCategory(recorded, category),
-    };
-  }
-  if (keepCategory) {
-    return { refund: reservationCharged, remaining: recorded ?? [] };
-  }
-  const remaining = removeCategory(recorded, category);
-  if (remaining.length > 0) return { refund: false, remaining };
-  return { refund: reservationCharged || gachaCharged === true, remaining };
+  const remaining = keepCategory ? (recorded ?? []) : removeCategory(recorded, category);
+  // カテゴリが残っていれば、最低1回の消費を、保持する。
+  const needed = remaining.length > 0 ? 1 : 0;
+  // 消費した呼び出しは、自分の分を戻す。消費していない呼び出し(別カテゴリ)は、ガチャとして
+  // 保持している分のうち、必要な回数を超える分を戻す。
+  const refund = reservationCharged ? heldCharges - 1 >= needed : heldCharges > needed;
+  return { refund, remaining };
 }
 
 /**
@@ -380,8 +417,14 @@ export async function reserveUsage(
     : undefined;
   const requestId = randomUUID();
 
+  const deletedRef = deletedAccountRef(uid);
+
   return db.runTransaction(async (tx) => {
     const userSnap = await tx.get(userRef);
+    // 削除済みのアカウントは、断る(削除したユーザーの記録を、作り直さないため)。
+    if ((await tx.get(deletedRef)).exists) {
+      throw new HttpsError("unauthenticated", "サインインが必要です");
+    }
     const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
@@ -404,23 +447,15 @@ export async function reserveUsage(
       }
     }
     if (gachaRef) {
-      // 記録が古い形式(chargedなし)のときは、消費済みとみなす。
-      const alreadyCharged = gachaSnap?.exists
-        ? (gachaSnap.data()?.charged ?? true)
-        : false;
-      // 回数の出どころと、消費した月は、ガチャで最初に消費したときのものを引き継ぐ
-      // (取り直しで、追加で消費した分は、その呼び出しの[Reservation]が持つ)。
       const existing = gachaSnap?.data();
-      const chargedSource = alreadyCharged
-        ? (existing?.chargedSource as UsageSource | undefined)
-        : source;
-      const chargedMonthKey = alreadyCharged
-        ? (existing?.chargedMonthKey as string | undefined)
-        : source
-          ? monthKeyOf(now)
-          : undefined;
+      // ガチャが、保持している消費の一覧。今回、消費したなら、1回分を加える(出どころと月つき)。
+      const charges: HeldCharge[] = [
+        ...readHeldCharges(existing),
+        ...(source ? [{ source, monthKey: monthKeyOf(now) }] : []),
+      ];
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
+        charges,
         // 取得に成功したカテゴリ(markCategorySucceededで記録する)。引き継ぐ。
         categorySucceeded: (existing?.categorySucceeded as string[] | undefined) ?? [],
         // カテゴリごとの、処理中の取得。終わった呼び出し(成功・失敗)が、自分を外す。
@@ -433,9 +468,7 @@ export async function reserveUsage(
             now.getTime(),
           ),
         },
-        charged: alreadyCharged || source !== undefined,
-        ...(chargedSource ? { chargedSource } : {}),
-        ...(chargedMonthKey ? { chargedMonthKey } : {}),
+        charged: charges.length > 0,
         updatedAt: now,
         expiresAt: new Date(now.getTime() + GACHA_USAGE_TTL_DAYS * 24 * 60 * 60 * 1000),
       });
@@ -443,8 +476,6 @@ export async function reserveUsage(
     return {
       charged: source !== undefined,
       source,
-      // 取得済みのカテゴリの取り直しで、追加で消費したか。
-      isRefetch: source !== undefined && recorded?.includes(category) === true,
       monthKey: monthKeyOf(now),
       requestId,
     };
@@ -514,9 +545,13 @@ export async function releaseUsage(
     const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const recorded = gachaSnap?.data()?.categories as string[] | undefined;
-    const gachaCharged = gachaSnap?.exists
-      ? ((gachaSnap.data()?.charged as boolean | undefined) ?? true)
-      : undefined;
+    // ガチャが、保持している消費の一覧。記録がない(gachaIdなし)ときは、今回消費した分だけ。
+    const heldList: HeldCharge[] = gachaSnap?.exists
+      ? readHeldCharges(gachaSnap.data())
+      : reservation.charged && reservation.source
+        ? [{ source: reservation.source, monthKey: reservation.monthKey }]
+        : [];
+    const heldCharges = heldList.length;
 
     // アカウントが削除されたあとに、遅れて終わった呼び出しは、何も書かない(削除した
     // ユーザーの記録を、作り直さないため)。
@@ -533,25 +568,27 @@ export async function releaseUsage(
 
     const { refund, remaining } = planRelease(
       reservation.charged,
-      gachaCharged,
+      heldCharges,
       recorded,
       category,
-      reservation.isRefetch,
       othersInFlight,
       categorySucceeded,
     );
 
+    let remainingCharges = heldList;
     if (refund) {
-      // 出どころの記録がない古い記録は、無料枠を消費したものとして戻す。
-      const source: UsageSource =
-        reservation.source ??
-        (gachaSnap?.data()?.chargedSource as UsageSource | undefined) ??
-        "free";
-      // 戻す回数を、消費した月。今回の呼び出しが消費したなら、その月。そうでなければ、
-      // ガチャの記録が持つ、最初に消費した月。
-      const chargedMonthKey = reservation.charged
-        ? reservation.monthKey
-        : (gachaSnap?.data()?.chargedMonthKey as string | undefined);
+      // 戻す1回分を、保持している一覧から、取り出す。今回の呼び出しが消費したもの(出どころと
+      // 月が同じもの)を優先する。実際に消費した回数(無料枠・月額枠・月)に、戻すため。
+      const taken = takeCharge(
+        heldList,
+        reservation.charged && reservation.source
+          ? { source: reservation.source, monthKey: reservation.monthKey }
+          : undefined,
+      );
+      remainingCharges = taken.rest;
+      const source: UsageSource = taken.entry?.source ?? reservation.source ?? "free";
+      const chargedMonthKey =
+        taken.entry?.monthKey ?? (reservation.charged ? reservation.monthKey : undefined);
       const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
       const refundFields = isRefundableMonth(
         source,
@@ -578,6 +615,8 @@ export async function releaseUsage(
         // 今回の呼び出しは、終わったので、処理中の一覧から、外す。
         tx.update(gachaRef, {
           categories: remaining,
+          charges: remainingCharges,
+          charged: remainingCharges.length > 0,
           [`inFlight.${category}`]: removeInFlight(inFlight, reservation.requestId),
         });
       }

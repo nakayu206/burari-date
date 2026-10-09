@@ -9,7 +9,9 @@ import {
   hasOtherInFlight,
   IN_FLIGHT_TTL_MS,
   isRefundableMonth,
+  readHeldCharges,
   removeInFlight,
+  takeCharge,
   isSubscriptionActive,
   isValidDeviceId,
   SUBSCRIPTION_GRACE_MS,
@@ -297,102 +299,141 @@ test("取得に失敗して記録から外したカテゴリは、取り直し�
   assert.deepEqual(planUsage(free(1), recorded, "sightseeing"), {});
 });
 
+// ---- 失敗したときの返却(消費の保持: planRelease(消費したか, 保持, 記録, カテゴリ, 処理中, 成功済み)) ----
+
 test("枠を消費したグルメが失敗しても、観光が成功・取得中なら枠を戻さない", () => {
-  // グルメ(数える)と観光(数えない)を並行して取得し、グルメだけ失敗した。
-  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet");
+  const plan = planRelease(true, 1, ["gourmet", "sightseeing"], "gourmet");
   assert.equal(plan.refund, false);
   assert.deepEqual(plan.remaining, ["sightseeing"]);
 });
 
 test("グルメが先に失敗したあと観光も失敗したら、そのガチャで消費した枠を戻す", () => {
-  // 1つ目の失敗では戻さず、記録に残った観光が失敗して空になったときに戻す。
-  const second = planRelease(false, true, ["sightseeing"], "sightseeing");
+  const second = planRelease(false, 1, ["sightseeing"], "sightseeing");
   assert.equal(second.refund, true);
   assert.deepEqual(second.remaining, []);
 });
 
 test("観光が先に失敗しても、グルメが残っていれば戻さず、グルメの失敗で戻す", () => {
-  assert.equal(planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing").refund, false);
-  assert.equal(planRelease(true, true, ["gourmet"], "gourmet").refund, true);
+  assert.equal(planRelease(false, 1, ["gourmet", "sightseeing"], "sightseeing").refund, false);
+  assert.equal(planRelease(true, 1, ["gourmet"], "gourmet").refund, true);
 });
 
-test("1つだけ取得して失敗したときは、消費した枠を戻す", () => {
-  assert.equal(planRelease(true, true, ["gourmet"], "gourmet").refund, true);
+test("1つだけ取得して失敗したときは、消費した枠を戻し、記録も空にする", () => {
+  const plan = planRelease(true, 1, ["gourmet"], "gourmet");
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, []);
 });
 
 test("gachaIdなし(記録なし)では、今回数えた分だけを戻す", () => {
-  assert.equal(planRelease(true, undefined, undefined, "gourmet").refund, true);
-  assert.equal(planRelease(false, undefined, undefined, "gourmet").refund, false);
+  assert.equal(planRelease(true, 1, undefined, "gourmet").refund, true);
+  assert.equal(planRelease(false, 0, undefined, "gourmet").refund, false);
 });
 
-test("取得に成功済みのカテゴリの取り直しが失敗したら、追加で消費した1回を戻し、カテゴリの記録は残す", () => {
-  // グルメ・観光を取得済みで、グルメを取り直して(追加で1回消費)失敗した。
-  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, true);
-  assert.equal(plan.refund, true);
-  assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"], "取得済みのカテゴリは、消さない");
-});
-
-test("取り直しの失敗で戻すのは、追加の1回だけ(ガチャの最初の消費は、戻さない)", () => {
-  // 取り直しが失敗しても、記録は残るので、そのあとで、もう一方の取り直しが失敗しても、
-  // 最初の消費は、全カテゴリが失敗するまで、戻らない。
-  const first = planRelease(true, true, ["gourmet"], "gourmet", true, false, true);
-  assert.equal(first.refund, true);
-  assert.deepEqual(first.remaining, ["gourmet"]);
-});
-
-test("ガチャの最初の消費(取り直しではない)は、これまでどおり", () => {
-  assert.equal(planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", false).refund, false);
-  assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false).refund, true);
-});
-
-test("遅れて失敗した呼び出しは、あとの呼び出しが引き継いだ記録を消さず、自分が消費した分だけ戻す", () => {
-  // 取得A開始 → 再試行B成功(Bが記録を引き継ぐ) → Aが失敗。
-  const plan = planRelease(true, true, ["gourmet"], "gourmet", false, true);
-  assert.equal(plan.refund, true, "Aが消費した1回は、戻す");
-  assert.deepEqual(plan.remaining, ["gourmet"], "Bが成功した記録は、消さない");
-});
-
-test("遅れて失敗しても、自分が消費していなければ、何も戻さない", () => {
-  const plan = planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing", false, true);
-  assert.equal(plan.refund, false);
-  assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"]);
-});
-
-test("あとの呼び出しがなければ(自分が最後の持ち主)、これまでどおり", () => {
-  assert.equal(planRelease(true, true, ["gourmet"], "gourmet", false, false).refund, true);
-  assert.deepEqual(planRelease(true, true, ["gourmet"], "gourmet", false, false).remaining, []);
-});
-
-test("取り直しが失敗して、そのカテゴリが、成功済みでなければ、取得済みの記録も消す(重なって両方失敗)", () => {
-  // A→Bの順に失敗: Aは返却のみ、Bは返却し、記録も消す。別のカテゴリが、消費なしで通る隙間を残さない。
-  const plan = planRelease(true, true, ["gourmet"], "gourmet", true, false, false);
-  assert.equal(plan.refund, true);
-  assert.deepEqual(plan.remaining, [], "成功していないので、記録は消す");
-});
-
-test("取り直しが失敗しても、そのカテゴリが、成功済みなら、取得済みの記録は残す", () => {
-  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, true);
+test("取得に成功済みのカテゴリの取り直しが失敗したら、追加で消費した1回を戻し、記録は残す", () => {
+  // 保持2回(最初の消費と、取り直しの追加)。成功済みなので、カテゴリは残り、必要は1回。
+  const plan = planRelease(true, 2, ["gourmet", "sightseeing"], "gourmet", false, true);
   assert.equal(plan.refund, true);
   assert.deepEqual(plan.remaining, ["gourmet", "sightseeing"]);
 });
 
-test("取り直しが失敗して、成功済みでなくても、ほかのカテゴリの記録は残す", () => {
-  const plan = planRelease(true, true, ["gourmet", "sightseeing"], "gourmet", true, false, false);
-  assert.deepEqual(plan.remaining, ["sightseeing"]);
-});
-
-test("処理中の取得(A)が残っている間に、取り直し(B)が失敗しても、カテゴリの記録は消さず、Bの分だけ戻す", () => {
-  // A開始→B開始→B失敗: Aは処理中なので、記録を消さない。
-  const plan = planRelease(true, true, ["gourmet"], "gourmet", true, true, false);
+test("処理中の取得(A)が残っている間に、取り直し(B)が失敗しても、記録は残し、Bの分だけ戻す", () => {
+  const plan = planRelease(true, 2, ["gourmet"], "gourmet", true, false);
   assert.equal(plan.refund, true);
   assert.deepEqual(plan.remaining, ["gourmet"]);
 });
 
-test("取り直し(B)が成功したあとに、最初の取得(A)が失敗しても、成功した記録は消さず、Aの分だけ戻す", () => {
-  // A開始→B開始→B成功→A失敗: Bが成功を記録済み(処理中の一覧は、Aだけ)。
-  const plan = planRelease(true, true, ["gourmet"], "gourmet", false, false, true);
-  assert.equal(plan.refund, true, "Aが消費した1回は、戻す");
-  assert.deepEqual(plan.remaining, ["gourmet"], "Bの成功の記録は、消さない");
+test("取り直し(B)が成功したあとに、最初の取得(A)が失敗しても、成功の記録は残し、Aの分だけ戻す", () => {
+  const plan = planRelease(true, 2, ["gourmet"], "gourmet", false, true);
+  assert.equal(plan.refund, true);
+  assert.deepEqual(plan.remaining, ["gourmet"]);
+});
+
+test("同じカテゴリの取得が重なって、両方失敗したら、消費は0になり、記録も消える", () => {
+  // A→Bの順に失敗。Aの時点では、Bが処理中なので、記録を残し、Aの分を戻す(保持2→1)。
+  const a = planRelease(true, 2, ["gourmet"], "gourmet", true, false);
+  assert.equal(a.refund, true);
+  // Bの失敗: 成功済みでも、処理中でもないので、記録を消し、残りの1回も戻す。
+  const b = planRelease(true, 1, ["gourmet"], "gourmet", false, false);
+  assert.equal(b.refund, true);
+  assert.deepEqual(b.remaining, []);
+});
+
+test("グルメA・Bが重複→観光が成功→A・Bが失敗: どの順番でも、観光の分の1回が残る", () => {
+  const recorded = ["gourmet", "sightseeing"];
+  // A→B の順: Aの時点でBは処理中(記録を残す)。保持2→1。Bは、観光が残るので、戻さない。
+  const a1 = planRelease(true, 2, recorded, "gourmet", true, false);
+  assert.equal(a1.refund, true);
+  const b1 = planRelease(true, 1, recorded, "gourmet", false, false);
+  assert.equal(b1.refund, false, "観光が使う1回は、残す");
+  assert.deepEqual(b1.remaining, ["sightseeing"]);
+  // B→A の順: Bの時点でAは処理中(記録を残す)。保持2→1。Aは、観光が残るので、戻さない。
+  const b2 = planRelease(true, 2, recorded, "gourmet", true, false);
+  assert.equal(b2.refund, true);
+  const a2 = planRelease(true, 1, recorded, "gourmet", false, false);
+  assert.equal(a2.refund, false);
+});
+
+test("グルメA開始→B開始→A失敗→観光成功→B失敗: 観光の分の1回が残る(観光の開始が遅い場合)", () => {
+  // Aの失敗の時点では、観光の記録は、まだない。Bが処理中なので、記録を残し、Aの分を戻す(2→1)。
+  const a = planRelease(true, 2, ["gourmet"], "gourmet", true, false);
+  assert.equal(a.refund, true);
+  // 観光が成功(消費なし。記録にグルメがあるため、別カテゴリは数えない)。Bが失敗。
+  const b = planRelease(true, 1, ["gourmet", "sightseeing"], "gourmet", false, false);
+  assert.equal(b.refund, false, "成功した観光のために、1回残す");
+  assert.deepEqual(b.remaining, ["sightseeing"]);
+});
+
+test("保持している消費の一覧: 新しい記録は、そのまま読み、古い記録は、1回分に直す", () => {
+  const list = [
+    { source: "free" as const, monthKey: "202610" },
+    { source: "monthly" as const, monthKey: "202610" },
+  ];
+  assert.deepEqual(readHeldCharges({ charges: list }), list);
+  // 古い記録(chargesなし): 出どころ・月の記録があれば、それを使う。
+  assert.deepEqual(
+    readHeldCharges({ charged: true, chargedSource: "monthly", chargedMonthKey: "202609" }),
+    [{ source: "monthly", monthKey: "202609" }],
+  );
+  // 出どころの記録がない古い記録は、無料枠。
+  assert.deepEqual(readHeldCharges({ charged: true }), [{ source: "free" }]);
+  assert.deepEqual(readHeldCharges({ charged: false }), []);
+  assert.deepEqual(readHeldCharges(undefined), []);
+});
+
+test("消費を戻すときは、今回の呼び出しが消費した出どころと月のものを優先して取り出す", () => {
+  const free = { source: "free" as const, monthKey: "202610" };
+  const monthly = { source: "monthly" as const, monthKey: "202610" };
+  const lastMonth = { source: "monthly" as const, monthKey: "202609" };
+
+  // 月額枠(今月)の呼び出しが失敗: 無料枠ではなく、月額枠(今月)を戻す。
+  const a = takeCharge([free, monthly], monthly);
+  assert.deepEqual(a.entry, monthly);
+  assert.deepEqual(a.rest, [free]);
+
+  // 先月に消費した月額枠: 月も、合わせる。
+  const b = takeCharge([monthly, lastMonth], lastMonth);
+  assert.deepEqual(b.entry, lastMonth);
+
+  // 今回消費していない呼び出し(別カテゴリ)は、いちばん古いものを戻す。
+  const c = takeCharge([free, monthly]);
+  assert.deepEqual(c.entry, free);
+
+  // 一致するものがなければ、いちばん古いもの。空なら、何もない。
+  assert.deepEqual(takeCharge([free], monthly).entry, free);
+  assert.deepEqual(takeCharge([]), { entry: undefined, rest: [] });
+});
+
+test("最初の消費(無料枠)を戻したあと、取り直し(月額枠)の分が残っても、別カテゴリの失敗は、月額枠に戻る", () => {
+  // 保持: A=無料枠、B=月額枠。Aが失敗して、Aの分(無料枠)が戻る。残りは、Bの月額枠。
+  const held = [
+    { source: "free" as const, monthKey: "202610" },
+    { source: "monthly" as const, monthKey: "202610" },
+  ];
+  const afterA = takeCharge(held, { source: "free", monthKey: "202610" });
+  assert.deepEqual(afterA.entry?.source, "free");
+  // 観光(消費していない呼び出し)が失敗して、ガチャの消費を戻すとき: 残っているのは、月額枠。
+  const forSightseeing = takeCharge(afterA.rest);
+  assert.equal(forSightseeing.entry?.source, "monthly", "無料枠ではなく、月額枠に戻る");
 });
 
 test("処理中の一覧: 追加・取り外し・ほかの処理中の判定", () => {
@@ -401,12 +442,10 @@ test("処理中の一覧: 追加・取り外し・ほかの処理中の判定", 
   const ab = addInFlight(a, "B", t0 + 1000);
   assert.deepEqual(ab.map((e) => e.id), ["A", "B"]);
 
-  // 自分のほかに、処理中があるか。
   assert.equal(hasOtherInFlight(ab, "B", t0 + 2000), true, "Aが処理中");
   assert.equal(hasOtherInFlight(removeInFlight(ab, "A"), "B", t0 + 2000), false);
   assert.equal(hasOtherInFlight(undefined, "B", t0), false);
 
-  // 同じIDは、重ならない。
   assert.equal(addInFlight(ab, "A", t0 + 3000).filter((e) => e.id === "A").length, 1);
 });
 
@@ -415,14 +454,8 @@ test("処理中の一覧: 期限を過ぎた記録は、無視する(クラッ�
   const list = addInFlight(undefined, "A", t0);
   assert.equal(hasOtherInFlight(list, "B", t0 + IN_FLIGHT_TTL_MS - 1), true);
   assert.equal(hasOtherInFlight(list, "B", t0 + IN_FLIGHT_TTL_MS), false);
-  // 追加のとき、古いものは取り除く。
   const next = addInFlight(list, "C", t0 + IN_FLIGHT_TTL_MS + 1);
   assert.deepEqual(next.map((e) => e.id), ["C"]);
-});
-
-test("消費していない呼び出しは、取り直し扱いにしない", () => {
-  // 別カテゴリで、消費しなかった呼び出し(isRefetchはfalse)。
-  assert.equal(planRelease(false, true, ["gourmet", "sightseeing"], "sightseeing", false).refund, false);
 });
 
 test("月の回数は、消費した月と、いまの月の回数の月が同じときだけ、戻す(月またぎ)", () => {

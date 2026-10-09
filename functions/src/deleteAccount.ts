@@ -2,6 +2,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
+import { clearAccountDeleted, markAccountDeleted } from "./account";
 import { isFirebaseUid, revenueCatApiKey } from "./subscription";
 
 /**
@@ -37,6 +38,10 @@ export async function deleteRevenueCatSubscriber(
  *    削除したあとでは、元のアカウントから、やり直せなくなるため。存在しない(404)ときは成功)。
  * 2. Firestoreの`users/{uid}`と、その下の履歴・お気に入り・利用の記録などを、すべて削除する。
  * 3. Firebase認証のユーザーを削除する。
+ * 4. 削除の途中に割り込んだ書き込みに備えて、Firestoreの削除を、もう一度行う(失敗しても続ける)。
+ *
+ * 削除の前に、削除済みの印(`deletedAccounts/{uid}`)を置く。削除前に始まった処理が、遅れて
+ * 終わっても、保存・確保のトランザクションの中で、この印を確認し、記録を作り直さない。
  *
  * 2が失敗したときは、3に進まない(認証のユーザーを残し、やり直せるようにする)。
  * 端末ごとの無料枠の記録(`devices/{id}`)は、個人に紐づかないため、削除しない
@@ -70,11 +75,17 @@ export const deleteAccount = onCall(
       );
     }
 
+    // 削除の前に、削除済みの印を置く。削除前に始まった処理が、遅れて終わっても、
+    // 保存・確保のトランザクションの中で、この印を見て、書かない(記録を作り直さない)。
+    await markAccountDeleted(uid);
+
     try {
       const db = getFirestore();
       await db.recursiveDelete(db.collection("users").doc(uid));
     } catch (e) {
       console.error("Firestoreのデータを削除できませんでした", e);
+      // アカウントは残っているので、印は外す(通常どおり、使えるように)。
+      await clearAccountDeleted(uid).catch(() => undefined);
       throw new HttpsError(
         "internal",
         "アカウントを削除できませんでした。しばらくしてから、もう一度お試しください。",
@@ -92,6 +103,15 @@ export const deleteAccount = onCall(
           "アカウントを削除できませんでした。しばらくしてから、もう一度お試しください。",
         );
       }
+    }
+
+    // 削除の途中に、割り込んだ書き込み(遅れて終わった取得・購読の通知)で、記録が、
+    // 作り直されていた場合に備えて、もう一度、削除する。失敗しても、削除自体は、済んでいる。
+    try {
+      const db = getFirestore();
+      await db.recursiveDelete(db.collection("users").doc(uid));
+    } catch (e) {
+      console.warn("Firestoreの再削除に失敗しました", e);
     }
 
     return { ok: true };
