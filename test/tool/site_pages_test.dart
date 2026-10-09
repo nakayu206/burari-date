@@ -53,6 +53,14 @@ void main() {
     expectPageHas('tokushoho.html', commerceSections);
   });
 
+  test('トップの運営者の欄に、連絡先のメールアドレスがあり、準備中のままではない', () {
+    final index = _read('index.html');
+
+    expect(index, contains('naka.tech0001@gmail.com'));
+    expect(index, contains('CenterRiverStudio'));
+    expect(index, isNot(contains('準備中</td>')));
+  });
+
   test('公開前のページは、検索に出さない(noindex)', () {
     // 規約の文面が確定し、公開する準備が整ったら、外す。
     for (final name in [
