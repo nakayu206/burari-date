@@ -11,6 +11,7 @@ import 'package:burari_date/presentation/pages/settings/legal_texts.dart';
 void main() {
   _write('terms.html', '利用規約', termsSections);
   _write('privacy.html', 'プライバシーポリシー', privacySections);
+  _write('delete-account.html', 'アカウントの削除', accountDeletionSections);
 }
 
 /// HTMLに埋め込めるよう、特殊な文字を置き換える。
@@ -47,6 +48,7 @@ String renderLegalPage(String title, List<LegalSection> sections) {
     ..writeln('    <nav>')
     ..writeln('      <a href="terms.html">利用規約</a>')
     ..writeln('      <a href="privacy.html">プライバシーポリシー</a>')
+    ..writeln('      <a href="delete-account.html">アカウントの削除</a>')
     ..writeln('    </nav>')
     ..writeln('  </header>')
     ..writeln('  <main>')

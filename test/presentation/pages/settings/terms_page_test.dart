@@ -47,6 +47,27 @@ void main() {
       }
     });
 
+    test('プライバシーポリシーには、アカウント・購読・端末の識別子・削除を、書く', () {
+      final privacy = all(privacySections);
+
+      expect(privacy, contains('Googleアカウント'));
+      expect(privacy, contains('RevenueCat'));
+      expect(privacy, contains('Google Play'));
+      expect(privacy, contains('端末の識別子'));
+      expect(privacy, contains('アカウントを削除'));
+      // アカウント・課金は、まだ提供していない、という古い記載が残っていない。
+      expect(privacy, isNot(contains('提供する場合は、取得する情報が増えます')));
+    });
+
+    test('アカウントの削除の案内には、手順・削除されるもの・残るもの・解約を書く', () {
+      final deletion = all(accountDeletionSections);
+
+      expect(deletion, contains('「アカウントを削除」を押す'));
+      expect(deletion, contains('履歴'));
+      expect(deletion, contains('残ります'));
+      expect(deletion, contains('Google Play'));
+    });
+
     test('プライバシーポリシーには、お問い合わせで、メールアドレスを取得することを書く', () {
       final privacy = all(privacySections);
 

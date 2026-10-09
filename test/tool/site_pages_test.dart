@@ -45,9 +45,18 @@ void main() {
     expectPageHas('privacy.html', privacySections);
   });
 
+  test('アカウントの削除のページは、アプリの文面と同じ', () {
+    expectPageHas('delete-account.html', accountDeletionSections);
+  });
+
   test('公開前のページは、検索に出さない(noindex)', () {
     // 規約の文面が確定し、公開する準備が整ったら、外す。
-    for (final name in ['index.html', 'terms.html', 'privacy.html']) {
+    for (final name in [
+      'index.html',
+      'terms.html',
+      'privacy.html',
+      'delete-account.html',
+    ]) {
       expect(
         _read(name),
         contains('name="robots" content="noindex"'),
