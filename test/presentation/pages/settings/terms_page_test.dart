@@ -73,6 +73,21 @@ void main() {
       expect(deletion, contains('1か月'));
     });
 
+    test('特定商取引法に基づく表記には、事業者・連絡先・価格・支払・解約・動作環境を書く', () {
+      final commerce = all(commerceSections);
+
+      expect(commerce, contains('CenterRiverStudio'));
+      expect(commerce, contains('運営統括責任者'));
+      expect(commerce, contains('請求があれば、遅滞なく開示します'));
+      expect(commerce, contains('naka.tech0001@gmail.com'));
+      expect(commerce, contains('月額300円(税込)'));
+      expect(commerce, contains('Google Play'));
+      expect(commerce, contains('解約'));
+      expect(commerce, contains('Android'));
+      // 「準備中」のまま、公開しない。
+      expect(commerce, isNot(contains('準備中')));
+    });
+
     test('プライバシーポリシーには、お問い合わせで、メールアドレスを取得することを書く', () {
       final privacy = all(privacySections);
 
