@@ -18,6 +18,8 @@ class _FakeAccountRepository implements AccountRepository {
   Object? loadError;
   Object? registerError;
   Object? signOutError;
+  Object? deleteError;
+  int deleteCount = 0;
   Completer<void>? registerGate;
   final registered = <LoginMethod>[];
   int signOutCount = 0;
@@ -59,6 +61,13 @@ class _FakeAccountRepository implements AccountRepository {
   Future<AccountStatus> signOut() async {
     signOutCount++;
     if (signOutError != null) throw signOutError!;
+    return status = const AccountStatus.guest();
+  }
+
+  @override
+  Future<AccountStatus> deleteAccount() async {
+    deleteCount++;
+    if (deleteError != null) throw deleteError!;
     return status = const AccountStatus.guest();
   }
 }
@@ -335,6 +344,65 @@ void main() {
 
       expect(repository.signOutCount, 0);
       expect(find.text('アカウント登録済み'), findsOneWidget);
+    });
+
+    testWidgets('「アカウントを削除」は、確認のあとに行い、ゲストの表示に戻る', (tester) async {
+      final repository = _FakeAccountRepository(
+        const AccountStatus.registered(method: LoginMethod.google),
+      );
+      await pumpPage(tester, repository);
+
+      await tester.tap(find.text('アカウントを削除'));
+      await tester.pumpAndSettle();
+      expect(find.text('アカウントを削除しますか?'), findsOneWidget);
+      // 元に戻せないこと・購読は自動では解約されないことを、先に知らせる。
+      expect(find.textContaining('元に戻すことは、できません'), findsOneWidget);
+      expect(find.textContaining('Google Playの「定期購入」'), findsOneWidget);
+      expect(repository.deleteCount, 0, reason: '確認の前には削除しない');
+
+      await tester.tap(find.text('削除する'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deleteCount, 1);
+      expect(find.text('ゲスト利用中'), findsOneWidget);
+      expect(find.text('アカウントを削除しました'), findsOneWidget);
+    });
+
+    testWidgets('削除の確認で「やめる」を選ぶと、削除しない', (tester) async {
+      final repository = _FakeAccountRepository(
+        const AccountStatus.registered(method: LoginMethod.google),
+      );
+      await pumpPage(tester, repository);
+
+      await tester.tap(find.text('アカウントを削除'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('やめる'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deleteCount, 0);
+      expect(find.text('アカウント登録済み'), findsOneWidget);
+    });
+
+    testWidgets('削除に失敗したら、ダイアログで知らせ、登録済みのまま', (tester) async {
+      final repository = _FakeAccountRepository(
+        const AccountStatus.registered(method: LoginMethod.google),
+      )..deleteError = const AccountException('通信できませんでした。');
+      await pumpPage(tester, repository);
+
+      await tester.tap(find.text('アカウントを削除'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('削除する'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('アカウントを削除できませんでした'), findsOneWidget);
+      expect(find.text('通信できませんでした。'), findsOneWidget);
+      expect(find.text('アカウント登録済み'), findsOneWidget);
+    });
+
+    testWidgets('ゲストには、「アカウントを削除」を出さない', (tester) async {
+      await pumpPage(tester, _FakeAccountRepository());
+
+      expect(find.text('アカウントを削除'), findsNothing);
     });
 
     testWidgets('ログアウトに失敗したら、ダイアログで知らせ、登録済みのまま', (tester) async {

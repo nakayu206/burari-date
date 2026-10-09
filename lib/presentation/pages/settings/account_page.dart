@@ -71,6 +71,44 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     );
   }
 
+  /// アカウントを削除する(Issue #191)。元に戻せないため、先に確認する。
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('アカウントを削除しますか?'),
+        content: const Text(
+          '履歴・お気に入りなど、このアカウントに保存された情報が、すべて削除されます。'
+          '元に戻すことは、できません。\n\n'
+          '購読中の場合は、アカウントを削除しても、購読は解約されません。'
+          'Google Playの「定期購入」から、別に解約してください。\n\n'
+          '無料で使える回数は、削除しても、元に戻りません。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('やめる'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _run(
+      errorTitle: 'アカウントを削除できませんでした',
+      action: () async {
+        await ref.read(accountStatusProvider.notifier).deleteAccount();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(const SnackBar(content: Text('アカウントを削除しました')));
+      },
+    );
+  }
+
   Future<void> _run({
     required String errorTitle,
     required Future<void> Function() action,
@@ -126,7 +164,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
               _Header(account: account),
               const SizedBox(height: AppSpacing.x2l),
               if (account.isRegistered)
-                _RegisteredBody(isBusy: _isBusy, onSignOut: _signOut)
+                _RegisteredBody(
+                  isBusy: _isBusy,
+                  onSignOut: _signOut,
+                  onDelete: _deleteAccount,
+                )
               else
                 _GuestBody(
                   isBusy: _isBusy,
@@ -255,10 +297,15 @@ class _GuestBody extends StatelessWidget {
 
 /// 登録済みのときの、ログアウトのボタン。
 class _RegisteredBody extends StatelessWidget {
-  const _RegisteredBody({required this.isBusy, required this.onSignOut});
+  const _RegisteredBody({
+    required this.isBusy,
+    required this.onSignOut,
+    required this.onDelete,
+  });
 
   final bool isBusy;
   final VoidCallback onSignOut;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +317,12 @@ class _RegisteredBody extends StatelessWidget {
         OutlinedButton(
           onPressed: isBusy ? null : onSignOut,
           child: const Text('ログアウト'),
+        ),
+        const SizedBox(height: AppSpacing.x2l),
+        // 元に戻せない操作なので、目立たせず、ログアウトから離して置く。
+        TextButton(
+          onPressed: isBusy ? null : onDelete,
+          child: const Text('アカウントを削除'),
         ),
       ],
     );
