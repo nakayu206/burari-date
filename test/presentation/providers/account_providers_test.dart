@@ -32,6 +32,10 @@ class _FakeAccountRepository implements AccountRepository {
 
   @override
   Future<AccountStatus> signOut() async => status = const AccountStatus.guest();
+
+  @override
+  Future<AccountStatus> deleteAccount() async =>
+      status = const AccountStatus.guest();
 }
 
 /// 読み込まれた回数を、数えるだけの、偽のお気に入り・履歴のリポジトリ。

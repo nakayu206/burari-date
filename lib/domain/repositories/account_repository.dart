@@ -47,4 +47,9 @@ abstract class AccountRepository {
   /// ログアウトする。ログアウト後の状態を返す。失敗したときは[AccountException]を
   /// 投げる。
   Future<AccountStatus> signOut();
+
+  /// いまのアカウントを削除する(Issue #191)。サーバーが、履歴・お気に入り・購読の情報などを
+  /// 削除し、削除後は、ゲストの状態に戻る。**元に戻せない**。購読は、自動では解約されない
+  /// (Google Playで、別に解約が必要)。失敗したときは[AccountException]を投げる。
+  Future<AccountStatus> deleteAccount();
 }

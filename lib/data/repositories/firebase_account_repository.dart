@@ -1,3 +1,5 @@
+import 'package:cloud_functions/cloud_functions.dart';
+
 import '../../domain/entities/account_status.dart';
 import '../../domain/repositories/account_repository.dart';
 import '../datasources/cloud/account_auth.dart';
@@ -13,11 +15,22 @@ class FirebaseAccountRepository implements AccountRepository {
   FirebaseAccountRepository({
     AccountAuth? auth,
     Future<void> Function()? ensureSignedIn,
+    Future<void> Function()? deleteOnServer,
   }) : _auth = auth ?? FirebaseAccountAuth(),
-       _ensureSignedIn = ensureSignedIn ?? _defaultEnsureSignedIn;
+       _ensureSignedIn = ensureSignedIn ?? _defaultEnsureSignedIn,
+       _deleteOnServer = deleteOnServer ?? _defaultDeleteOnServer;
 
   final AccountAuth _auth;
   final Future<void> Function() _ensureSignedIn;
+
+  /// サーバーで、アカウントのデータを削除する呼び出し(テストで差し替える)。
+  final Future<void> Function() _deleteOnServer;
+
+  static Future<void> _defaultDeleteOnServer() async {
+    await FirebaseFunctions.instance
+        .httpsCallable('deleteAccount')
+        .call<void>();
+  }
 
   static Future<void> _defaultEnsureSignedIn() async {
     await AnonymousAuth.instance.ensureUid();
@@ -68,6 +81,28 @@ class FirebaseAccountRepository implements AccountRepository {
     }
     // ログアウトしたあとも、ゲストとして使い続けられるよう、匿名でログインし直す。
     // 失敗しても、ログアウトは済んでおり、次の操作の前に、ログインをやり直す。
+    try {
+      await _ensureSignedIn();
+    } catch (_) {}
+    return const AccountStatus.guest();
+  }
+
+  @override
+  Future<AccountStatus> deleteAccount() async {
+    try {
+      await _deleteOnServer();
+    } catch (_) {
+      // 失敗したときは、サーバーのデータは、残っている(やり直せる)。内部の表記は出さない。
+      throw const AccountException(
+        'アカウントを削除できませんでした。通信を確かめて、時間をおいて、もう一度お試しください。',
+      );
+    }
+    // サーバーは、ログインのユーザーも削除した。端末のログインの状態も、消す。すでに
+    // 無効になっているため、失敗しても、問題ない。
+    try {
+      await _auth.signOut();
+    } catch (_) {}
+    // 削除したあとも、ゲストとして使い続けられるよう、匿名でログインし直す。
     try {
       await _ensureSignedIn();
     } catch (_) {}

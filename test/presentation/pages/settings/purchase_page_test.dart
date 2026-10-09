@@ -51,6 +51,10 @@ class _FakeAccountRepository implements AccountRepository {
 
   @override
   Future<AccountStatus> signOut() async => status = const AccountStatus.guest();
+
+  @override
+  Future<AccountStatus> deleteAccount() async =>
+      status = const AccountStatus.guest();
 }
 
 /// 状態を持つだけの偽のリポジトリ。[purchaseError]・[restoreResult]などで、結果を変える。

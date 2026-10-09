@@ -40,6 +40,13 @@ class AccountNotifier extends AsyncNotifier<AccountStatus> {
     _resetAccountData();
   }
 
+  /// いまのアカウントを削除し、ゲストの状態に戻る(Issue #191)。
+  Future<void> deleteAccount() async {
+    final status = await ref.read(accountRepositoryProvider).deleteAccount();
+    state = AsyncData(status);
+    _resetAccountData();
+  }
+
   /// ログイン・ログアウトで、アカウント(UID)が変わったとき、前のアカウントの内容が、
   /// 画面に残らないよう、UIDに紐づく情報を、取り直す。登録(紐づけ)では、UIDが変わらない
   /// ので、不要。

@@ -52,6 +52,7 @@ void main() {
   late List<String> log;
   late _FakeAccountAuth auth;
   Object? ensureSignedInError;
+  Object? deleteOnServerError;
 
   FirebaseAccountRepository newRepository() => FirebaseAccountRepository(
     auth: auth,
@@ -59,12 +60,17 @@ void main() {
       log.add('ensureSignedIn');
       if (ensureSignedInError != null) throw ensureSignedInError!;
     },
+    deleteOnServer: () async {
+      log.add('deleteOnServer');
+      if (deleteOnServerError != null) throw deleteOnServerError!;
+    },
   );
 
   setUp(() {
     log = [];
     auth = _FakeAccountAuth(log);
     ensureSignedInError = null;
+    deleteOnServerError = null;
   });
 
   test('いまの状態を返す', () async {
@@ -250,6 +256,42 @@ void main() {
         throwsA(isA<AccountException>()),
       );
       expect(log, ['signOut']);
+    });
+  });
+
+  group('deleteAccount', () {
+    test('サーバーで削除したあと、端末のログインも消し、匿名でログインし直して、ゲストの状態を返す', () async {
+      auth.status = const AccountStatus.registered(method: LoginMethod.google);
+
+      final status = await newRepository().deleteAccount();
+
+      expect(log, ['deleteOnServer', 'signOut', 'ensureSignedIn']);
+      expect(status, const AccountStatus.guest());
+    });
+
+    test('サーバーでの削除に失敗したら、利用者向けのエラーにして、ログアウトしない(やり直せる)', () async {
+      deleteOnServerError = Exception('boom');
+
+      await expectLater(
+        newRepository().deleteAccount(),
+        throwsA(
+          isA<AccountException>().having(
+            (e) => e.message,
+            'message',
+            isNot(contains('boom')),
+          ),
+        ),
+      );
+      expect(log, ['deleteOnServer']);
+    });
+
+    test('端末のログアウトや、匿名のログインし直しに失敗しても、削除は成功にする', () async {
+      auth.signOutError = FirebaseAuthException(code: 'user-not-found');
+      ensureSignedInError = Exception('network');
+
+      final status = await newRepository().deleteAccount();
+
+      expect(status, const AccountStatus.guest());
     });
   });
 
