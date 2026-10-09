@@ -9,7 +9,9 @@ import {
   hasOtherInFlight,
   IN_FLIGHT_TTL_MS,
   isRefundableMonth,
+  readHeldCharges,
   removeInFlight,
+  takeCharge,
   isSubscriptionActive,
   isValidDeviceId,
   SUBSCRIPTION_GRACE_MS,
@@ -379,6 +381,59 @@ test("グルメA開始→B開始→A失敗→観光成功→B失敗: 観光の�
   const b = planRelease(true, 1, ["gourmet", "sightseeing"], "gourmet", false, false);
   assert.equal(b.refund, false, "成功した観光のために、1回残す");
   assert.deepEqual(b.remaining, ["sightseeing"]);
+});
+
+test("保持している消費の一覧: 新しい記録は、そのまま読み、古い記録は、1回分に直す", () => {
+  const list = [
+    { source: "free" as const, monthKey: "202610" },
+    { source: "monthly" as const, monthKey: "202610" },
+  ];
+  assert.deepEqual(readHeldCharges({ charges: list }), list);
+  // 古い記録(chargesなし): 出どころ・月の記録があれば、それを使う。
+  assert.deepEqual(
+    readHeldCharges({ charged: true, chargedSource: "monthly", chargedMonthKey: "202609" }),
+    [{ source: "monthly", monthKey: "202609" }],
+  );
+  // 出どころの記録がない古い記録は、無料枠。
+  assert.deepEqual(readHeldCharges({ charged: true }), [{ source: "free" }]);
+  assert.deepEqual(readHeldCharges({ charged: false }), []);
+  assert.deepEqual(readHeldCharges(undefined), []);
+});
+
+test("消費を戻すときは、今回の呼び出しが消費した出どころと月のものを優先して取り出す", () => {
+  const free = { source: "free" as const, monthKey: "202610" };
+  const monthly = { source: "monthly" as const, monthKey: "202610" };
+  const lastMonth = { source: "monthly" as const, monthKey: "202609" };
+
+  // 月額枠(今月)の呼び出しが失敗: 無料枠ではなく、月額枠(今月)を戻す。
+  const a = takeCharge([free, monthly], monthly);
+  assert.deepEqual(a.entry, monthly);
+  assert.deepEqual(a.rest, [free]);
+
+  // 先月に消費した月額枠: 月も、合わせる。
+  const b = takeCharge([monthly, lastMonth], lastMonth);
+  assert.deepEqual(b.entry, lastMonth);
+
+  // 今回消費していない呼び出し(別カテゴリ)は、いちばん古いものを戻す。
+  const c = takeCharge([free, monthly]);
+  assert.deepEqual(c.entry, free);
+
+  // 一致するものがなければ、いちばん古いもの。空なら、何もない。
+  assert.deepEqual(takeCharge([free], monthly).entry, free);
+  assert.deepEqual(takeCharge([]), { entry: undefined, rest: [] });
+});
+
+test("最初の消費(無料枠)を戻したあと、取り直し(月額枠)の分が残っても、別カテゴリの失敗は、月額枠に戻る", () => {
+  // 保持: A=無料枠、B=月額枠。Aが失敗して、Aの分(無料枠)が戻る。残りは、Bの月額枠。
+  const held = [
+    { source: "free" as const, monthKey: "202610" },
+    { source: "monthly" as const, monthKey: "202610" },
+  ];
+  const afterA = takeCharge(held, { source: "free", monthKey: "202610" });
+  assert.deepEqual(afterA.entry?.source, "free");
+  // 観光(消費していない呼び出し)が失敗して、ガチャの消費を戻すとき: 残っているのは、月額枠。
+  const forSightseeing = takeCharge(afterA.rest);
+  assert.equal(forSightseeing.entry?.source, "monthly", "無料枠ではなく、月額枠に戻る");
 });
 
 test("処理中の一覧: 追加・取り外し・ほかの処理中の判定", () => {
