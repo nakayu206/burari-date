@@ -49,6 +49,10 @@ void main() {
     expectPageHas('delete-account.html', accountDeletionSections);
   });
 
+  test('特定商取引法に基づく表記のページは、アプリの文面と同じ', () {
+    expectPageHas('tokushoho.html', commerceSections);
+  });
+
   test('公開前のページは、検索に出さない(noindex)', () {
     // 規約の文面が確定し、公開する準備が整ったら、外す。
     for (final name in [
@@ -56,6 +60,7 @@ void main() {
       'terms.html',
       'privacy.html',
       'delete-account.html',
+      'tokushoho.html',
     ]) {
       expect(
         _read(name),

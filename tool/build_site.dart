@@ -12,6 +12,7 @@ void main() {
   _write('terms.html', '利用規約', termsSections);
   _write('privacy.html', 'プライバシーポリシー', privacySections);
   _write('delete-account.html', 'アカウントの削除', accountDeletionSections);
+  _write('tokushoho.html', '特定商取引法に基づく表記', commerceSections);
 }
 
 /// HTMLに埋め込めるよう、特殊な文字を置き換える。
@@ -49,6 +50,7 @@ String renderLegalPage(String title, List<LegalSection> sections) {
     ..writeln('      <a href="terms.html">利用規約</a>')
     ..writeln('      <a href="privacy.html">プライバシーポリシー</a>')
     ..writeln('      <a href="delete-account.html">アカウントの削除</a>')
+    ..writeln('      <a href="tokushoho.html">特定商取引法に基づく表記</a>')
     ..writeln('    </nav>')
     ..writeln('  </header>')
     ..writeln('  <main>')
