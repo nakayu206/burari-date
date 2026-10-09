@@ -285,12 +285,31 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
                     onRestore: _restore,
                   ),
                 // 購入の前に、事業者の情報・価格・解約を確認できるようにする(特定商取引法)。
+                // 購入の邪魔にならないよう、右下に、小さい文字で置く。
                 const SizedBox(height: AppSpacing.sm),
-                TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CommercePage()),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const CommercePage()),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      CommercePage.title,
+                      style: TextStyle(
+                        fontSize: AppFontSizes.caption,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
-                  child: const Text(CommercePage.title),
                 ),
               ],
             ),

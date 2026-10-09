@@ -9,7 +9,6 @@ import 'package:burari_date/domain/entities/sound_settings.dart';
 import 'package:burari_date/presentation/pages/settings/ai_preference_page.dart';
 import 'package:burari_date/domain/services/sound_player.dart';
 import 'package:burari_date/presentation/pages/settings/contact_page.dart';
-import 'package:burari_date/presentation/pages/settings/commerce_page.dart';
 import 'package:burari_date/presentation/pages/settings/sound_settings_page.dart';
 import 'package:burari_date/presentation/pages/settings/terms_page.dart';
 import 'package:burari_date/presentation/providers/sound_providers.dart';
@@ -74,22 +73,15 @@ void main() {
       expect(find.text('利用規約・お問い合わせ'), findsNothing);
     });
 
-    testWidgets('「特定商取引法に基づく表記」は、事業者・価格・解約などの本文の画面に移る', (tester) async {
+    testWidgets('「特定商取引法に基づく表記」は、設定には並べず、プラン画面のリンクだけにする', (tester) async {
       _useLargeScreen(tester);
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: SettingsPage())),
       );
 
-      await tester.tap(find.text('特定商取引法に基づく表記'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(CommercePage), findsOneWidget);
-      expect(find.text('販売事業者'), findsOneWidget);
-      expect(find.text('CenterRiverStudio'), findsOneWidget);
-      expect(
-        find.text('月額300円(税込)です。アプリの購入画面に表示される金額が、正しい金額です。'),
-        findsOneWidget,
-      );
+      expect(find.text('特定商取引法に基づく表記'), findsNothing);
+      // プラン画面へは、設定から行ける。
+      expect(find.text('プラン'), findsOneWidget);
     });
 
     testWidgets('「利用規約」は規約の画面、「お問い合わせ」はお問い合わせの画面に移る', (tester) async {

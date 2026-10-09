@@ -8,7 +8,6 @@ import 'account_page.dart';
 import 'contact_page.dart';
 import 'purchase_page.dart';
 import 'ai_preference_page.dart';
-import 'commerce_page.dart';
 import 'sound_settings_page.dart';
 import 'terms_page.dart';
 
@@ -22,7 +21,6 @@ class SettingsPage extends StatelessWidget {
     ('アカウント', (_) => const AccountPage()),
     ('プラン', (_) => const PurchasePage()),
     ('利用規約', (_) => const TermsPage()),
-    (CommercePage.title, (_) => const CommercePage()),
     ('お問い合わせ', (_) => const ContactPage()),
   ];
 
