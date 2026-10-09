@@ -9,6 +9,7 @@ import 'package:burari_date/domain/entities/account_status.dart';
 import 'package:burari_date/domain/entities/subscription.dart';
 import 'package:burari_date/domain/repositories/account_repository.dart';
 import 'package:burari_date/domain/repositories/purchase_repository.dart';
+import 'package:burari_date/presentation/pages/settings/commerce_page.dart';
 import 'package:burari_date/presentation/pages/settings/purchase_page.dart';
 import 'package:burari_date/presentation/providers/account_providers.dart';
 import 'package:burari_date/presentation/providers/auth_providers.dart';
@@ -686,6 +687,16 @@ void main() {
         find.widgetWithText(ElevatedButton, 'Googleで登録して購入する'),
       );
       expect(tester.getRect(signInLink()).top, greaterThan(register.bottom));
+    });
+
+    testWidgets('購入の前に、「特定商取引法に基づく表記」を開ける', (tester) async {
+      await pumpPage(tester, _FakePurchaseRepository(), hasAccount: false);
+
+      await tester.tap(find.text('特定商取引法に基づく表記'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CommercePage), findsOneWidget);
+      expect(find.text('CenterRiverStudio'), findsOneWidget);
     });
 
     testWidgets('未登録のときも、スクロールなしの、1画面に収まる(Pixel 8a)', (tester) async {

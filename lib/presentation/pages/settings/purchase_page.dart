@@ -13,6 +13,7 @@ import '../../providers/account_providers.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/purchase_providers.dart';
 import '../../widgets/login_confirm_dialog.dart';
+import 'commerce_page.dart';
 
 /// launchUrlと同じ形の関数型。実機では実際のurl_launcher.launchUrlを使うが、
 /// テストでは実プラットフォーム呼び出し(ストアアプリの起動)を避けるため差し替える。
@@ -283,6 +284,14 @@ class _PurchasePageState extends ConsumerState<PurchasePage>
                     onPurchase: _purchase,
                     onRestore: _restore,
                   ),
+                // 購入の前に、事業者の情報・価格・解約を確認できるようにする(特定商取引法)。
+                const SizedBox(height: AppSpacing.sm),
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CommercePage()),
+                  ),
+                  child: const Text(CommercePage.title),
+                ),
               ],
             ),
           ),
