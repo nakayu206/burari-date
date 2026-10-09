@@ -12,3 +12,5 @@ export { getCandidates } from "./candidates";
 export { sendInquiry } from "./sendInquiry";
 
 export { revenueCatWebhook } from "./revenueCatWebhook";
+
+export { deleteAccount } from "./deleteAccount";
