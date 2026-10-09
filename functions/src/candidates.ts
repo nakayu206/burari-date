@@ -1,3 +1,4 @@
+import { getAuth } from "firebase-admin/auth";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { anthropicApiKey, generateCandidates } from "./ai";
@@ -13,6 +14,22 @@ import { hotpepperApiKey, searchGourmet } from "./gourmet";
 import { parsePreference, prioritizeByGenres } from "./preference";
 import { foursquareApiKey, searchSightseeing } from "./sightseeing";
 import type { Candidate, CandidateCategory } from "./types";
+
+/**
+ * 削除済みのアカウントからの呼び出しを、断る。アカウントを削除したあとも、ログインの情報
+ * (トークン)は、しばらく有効なため、そのまま通すと、削除したユーザーの記録を、作り直して
+ * しまう。確認できなかったとき(通信の失敗など)は、通す(正規の利用者を、止めないため)。
+ */
+async function assertAccountExists(uid: string): Promise<void> {
+  try {
+    await getAuth().getUser(uid);
+  } catch (e) {
+    if ((e as { code?: string }).code === "auth/user-not-found") {
+      throw new HttpsError("unauthenticated", "サインインが必要です");
+    }
+    console.warn("ユーザーを確認できませんでした", e);
+  }
+}
 
 interface GetCandidatesRequest {
   latitude: number;
@@ -72,6 +89,7 @@ export const getCandidates = onCall<GetCandidatesRequest>(
     }
 
     const uid = request.auth.uid;
+    await assertAccountExists(uid);
     const reservation = await reserveUsage(uid, category, gachaId, undefined, deviceId);
 
     try {
@@ -112,7 +130,7 @@ export const getCandidates = onCall<GetCandidatesRequest>(
         await releaseUsage(uid, reservation, category, gachaId, undefined, deviceId);
       } else {
         // 取得に成功したことを記録する(あとの取り直しが失敗しても、記録を消さないため)。
-        await markCategorySucceeded(uid, gachaId, category);
+        await markCategorySucceeded(uid, gachaId, category, reservation.requestId);
       }
 
       return { candidates };

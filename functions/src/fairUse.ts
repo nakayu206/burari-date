@@ -259,6 +259,47 @@ export function addCategory(recorded: string[] | undefined, category: string): s
   return list.includes(category) ? list : [...list, category];
 }
 
+/**
+ * 処理中の取得を、記録に残しておく時間(ミリ秒)。`getCandidates`の待ち時間(120秒)より
+ * 長くする。クラッシュなどで、処理中のまま残った記録は、これを過ぎたら、無視する。
+ */
+export const IN_FLIGHT_TTL_MS = 150 * 1000;
+
+/** カテゴリごとの、処理中の取得(呼び出しのIDと、開始した時刻) */
+export interface InFlightEntry {
+  id: string;
+  at: number;
+}
+
+/** 処理中の取得の一覧に、今回の呼び出しを加える。古い(期限を過ぎた)ものは、取り除く。 */
+export function addInFlight(
+  list: InFlightEntry[] | undefined,
+  requestId: string,
+  nowMs: number,
+): InFlightEntry[] {
+  const alive = (list ?? []).filter(
+    (e) => e.id !== requestId && nowMs - e.at < IN_FLIGHT_TTL_MS,
+  );
+  return [...alive, { id: requestId, at: nowMs }];
+}
+
+/** 処理中の取得の一覧から、今回の呼び出しを外す(成功・失敗で、終わったとき)。 */
+export function removeInFlight(
+  list: InFlightEntry[] | undefined,
+  requestId: string,
+): InFlightEntry[] {
+  return (list ?? []).filter((e) => e.id !== requestId);
+}
+
+/** 今回の呼び出しのほかに、同じカテゴリで、処理中の取得があるか(期限を過ぎたものは除く)。 */
+export function hasOtherInFlight(
+  list: InFlightEntry[] | undefined,
+  requestId: string,
+  nowMs: number,
+): boolean {
+  return (list ?? []).some((e) => e.id !== requestId && nowMs - e.at < IN_FLIGHT_TTL_MS);
+}
+
 /** ガチャの記録からカテゴリを外す */
 export function removeCategory(recorded: string[] | undefined, category: string): string[] {
   return (recorded ?? []).filter((c) => c !== category);
@@ -283,9 +324,8 @@ export function removeCategory(recorded: string[] | undefined, category: string)
  *   とき、成功済みなら、取得済みの記録を残す。成功していなければ(最初の取得が処理中・失敗で、
  *   取り直しも失敗)、記録も消す。残すと、別のカテゴリの取得が、利用上限に達していても、
  *   消費なしで通ってしまう。
- * - `isSuperseded`: 同じカテゴリで、あとから、別の呼び出し(取り直し)が、ガチャの記録を
- *   引き継いでいるか。その場合、遅れて失敗した今回の呼び出しは、ガチャの記録を消さず、
- *   今回消費した分だけを戻す(あとの呼び出しが成功していれば、その記録が、消えてしまい、
+ * - `othersInFlight`: 同じカテゴリで、今回のほかに、処理中の取得があるか。ある間は、そのカテゴリの
+ *   記録を消さず、今回消費した分だけを戻す(処理中の取得が成功したとき、記録が消えていると、
  *   別のカテゴリの取得で、また消費してしまうため)。
  */
 export function planRelease(
@@ -294,17 +334,19 @@ export function planRelease(
   recorded: string[] | undefined,
   category: string,
   isRefetch = false,
-  isSuperseded = false,
+  othersInFlight = false,
   categorySucceeded = false,
 ): { refund: boolean; remaining: string[] } {
-  if (isSuperseded) {
-    return { refund: reservationCharged, remaining: recorded ?? [] };
-  }
+  // 成功済み、または、ほかに処理中の取得があるカテゴリは、記録を消さない。
+  const keepCategory = categorySucceeded || othersInFlight;
   if (isRefetch && reservationCharged) {
     return {
       refund: true,
-      remaining: categorySucceeded ? (recorded ?? []) : removeCategory(recorded, category),
+      remaining: keepCategory ? (recorded ?? []) : removeCategory(recorded, category),
     };
+  }
+  if (keepCategory) {
+    return { refund: reservationCharged, remaining: recorded ?? [] };
   }
   const remaining = removeCategory(recorded, category);
   if (remaining.length > 0) return { refund: false, remaining };
@@ -379,13 +421,17 @@ export async function reserveUsage(
           : undefined;
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
-        // カテゴリごとに、最後に枠を確保した呼び出しを記録する(遅れて失敗した、前の呼び出しが、
-        // あとの呼び出しの記録を消さないように)。
         // 取得に成功したカテゴリ(markCategorySucceededで記録する)。引き継ぐ。
         categorySucceeded: (existing?.categorySucceeded as string[] | undefined) ?? [],
-        categoryOwners: {
-          ...((existing?.categoryOwners as Record<string, string> | undefined) ?? {}),
-          [category]: requestId,
+        // カテゴリごとの、処理中の取得。終わった呼び出し(成功・失敗)が、自分を外す。
+        // ほかに処理中のものがある間は、失敗した呼び出しが、カテゴリの記録を消さない。
+        inFlight: {
+          ...((existing?.inFlight as Record<string, InFlightEntry[]> | undefined) ?? {}),
+          [category]: addInFlight(
+            (existing?.inFlight as Record<string, InFlightEntry[]> | undefined)?.[category],
+            requestId,
+            now.getTime(),
+          ),
         },
         charged: alreadyCharged || source !== undefined,
         ...(chargedSource ? { chargedSource } : {}),
@@ -406,23 +452,36 @@ export async function reserveUsage(
 }
 
 /**
- * そのカテゴリの取得に成功したことを、ガチャの記録に残す。あとの取り直しが失敗しても、
- * 成功済みのカテゴリの記録を消さないために使う。記録がない(ほかの呼び出しが消した)
- * ときや、失敗したときは、何もしない(取得自体は成功しているため、失敗にしない)。
+ * そのカテゴリの取得に成功したことを、ガチャの記録に残し、処理中の一覧から、今回の呼び出しを
+ * 外す。あとの取り直しが失敗しても、成功済みのカテゴリの記録を消さないために使う。記録がない
+ * (ほかの呼び出しが消した・アカウントを削除した)ときや、失敗したときは、何もしない
+ * (取得自体は成功しているため、失敗にしない)。
  */
 export async function markCategorySucceeded(
   uid: string,
   gachaId: string | undefined,
   category: string,
+  requestId: string,
 ): Promise<void> {
   if (!gachaId) return;
   try {
-    await getFirestore()
+    const db = getFirestore();
+    const ref = db
       .collection("users")
       .doc(uid)
       .collection("gachaUsage")
-      .doc(gachaId)
-      .update({ categorySucceeded: FieldValue.arrayUnion(category) });
+      .doc(gachaId);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const inFlight = (snap.data()?.inFlight as Record<string, InFlightEntry[]> | undefined)?.[
+        category
+      ];
+      tx.update(ref, {
+        categorySucceeded: FieldValue.arrayUnion(category),
+        [`inFlight.${category}`]: removeInFlight(inFlight, requestId),
+      });
+    });
   } catch (e) {
     console.warn("取得の成功を記録できませんでした", e);
   }
@@ -459,11 +518,15 @@ export async function releaseUsage(
       ? ((gachaSnap.data()?.charged as boolean | undefined) ?? true)
       : undefined;
 
-    // 同じカテゴリで、あとから、別の呼び出し(取り直し)が、枠を確保していたか。
-    const owner = (
-      gachaSnap?.data()?.categoryOwners as Record<string, string> | undefined
+    // アカウントが削除されたあとに、遅れて終わった呼び出しは、何も書かない(削除した
+    // ユーザーの記録を、作り直さないため)。
+    if (!userSnap.exists) return;
+
+    // 同じカテゴリで、今回のほかに、処理中の取得があるか。
+    const inFlight = (
+      gachaSnap?.data()?.inFlight as Record<string, InFlightEntry[]> | undefined
     )?.[category];
-    const isSuperseded = owner !== undefined && owner !== reservation.requestId;
+    const othersInFlight = hasOtherInFlight(inFlight, reservation.requestId, now.getTime());
     const categorySucceeded =
       (gachaSnap?.data()?.categorySucceeded as string[] | undefined)?.includes(category) ===
       true;
@@ -474,7 +537,7 @@ export async function releaseUsage(
       recorded,
       category,
       reservation.isRefetch,
-      isSuperseded,
+      othersInFlight,
       categorySucceeded,
     );
 
@@ -512,7 +575,11 @@ export async function releaseUsage(
       if (remaining.length === 0) {
         tx.delete(gachaRef);
       } else {
-        tx.set(gachaRef, { categories: remaining }, { merge: true });
+        // 今回の呼び出しは、終わったので、処理中の一覧から、外す。
+        tx.update(gachaRef, {
+          categories: remaining,
+          [`inFlight.${category}`]: removeInFlight(inFlight, reservation.requestId),
+        });
       }
     }
   });

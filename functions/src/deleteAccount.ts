@@ -33,7 +33,8 @@ export async function deleteRevenueCatSubscriber(
  * ログイン中のユーザー自身のアカウントを削除する(Issue #190)。Google Playの規則
  * (アカウントを作れるアプリは、アプリ内で、アカウントの削除を依頼できること)に対応する。
  *
- * 1. RevenueCatの購読者の情報を削除する(失敗しても続ける)。
+ * 1. RevenueCatの購読者の情報を削除する(失敗したら、何も削除せず、エラーを返す。
+ *    削除したあとでは、元のアカウントから、やり直せなくなるため。存在しない(404)ときは成功)。
  * 2. Firestoreの`users/{uid}`と、その下の履歴・お気に入り・利用の記録などを、すべて削除する。
  * 3. Firebase認証のユーザーを削除する。
  *
@@ -60,7 +61,13 @@ export const deleteAccount = onCall(
     try {
       await deleteRevenueCatSubscriber(revenueCatApiKey.value(), uid);
     } catch (e) {
-      console.warn("RevenueCatの購読者の情報を削除できませんでした", e);
+      // 購読者の情報が残らないよう、ここで止める。Firestore・認証のユーザーは残るので、
+      // 利用者は、あとから、やり直せる。
+      console.error("RevenueCatの購読者の情報を削除できませんでした", e);
+      throw new HttpsError(
+        "internal",
+        "アカウントを削除できませんでした。しばらくしてから、もう一度お試しください。",
+      );
     }
 
     try {
