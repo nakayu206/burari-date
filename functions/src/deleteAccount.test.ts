@@ -51,3 +51,15 @@ test("RevenueCatの削除: ほかのエラーは、失敗として投げる", as
     globalThis.fetch = original;
   }
 });
+
+test("削除済みの印は、ユーザーIDのドキュメントで、日時と有効期限だけを持つ", async () => {
+  const { deletedAccountData, DELETED_ACCOUNT_TTL_DAYS } = await import("./account");
+  const now = new Date("2026-10-09T05:00:00Z");
+  const data = deletedAccountData(now);
+  assert.deepEqual(Object.keys(data).sort(), ["deletedAt", "expiresAt"]);
+  assert.equal(data.deletedAt.getTime(), now.getTime());
+  assert.equal(
+    data.expiresAt.getTime() - now.getTime(),
+    DELETED_ACCOUNT_TTL_DAYS * 24 * 60 * 60 * 1000,
+  );
+});

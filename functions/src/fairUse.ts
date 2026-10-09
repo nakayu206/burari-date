@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
+import { deletedAccountRef } from "./account";
+
 /**
  * 無料で使える累計回数(コスト対策バックストップ、仕様書10章)。
  * 1回は「1回のガチャ」で、そのガチャのグルメ・観光の両方の取得を含む。
@@ -134,8 +136,6 @@ export interface Reservation {
   charged: boolean;
   /** 消費した回数の出どころ(消費していないときはundefined) */
   source?: UsageSource;
-  /** 取得済みのカテゴリの取り直しで、追加で消費したか(失敗したら、その1回だけを戻す) */
-  isRefetch: boolean;
   /** 枠を確保した月(日本時間のYYYYMM)。月をまたいで失敗したときに、戻す月を照合する */
   monthKey: string;
   /**
@@ -306,51 +306,40 @@ export function removeCategory(recorded: string[] | undefined, category: string)
 }
 
 /**
- * 取得に失敗したカテゴリの枠を戻すかどうかを判断する(Firestoreを使わない純粋な関数)。
+ * 取得に失敗した呼び出しの枠を、戻すかどうかを判断する(Firestoreを使わない純粋な関数)。
  *
- * グルメ・観光は並行して取得するため、回数を消費した側(最初に確保した側)が
- * 失敗しても、もう一方が成功・取得中なら、そのガチャは使われている。この場合は
- * 枠を戻さず、ガチャの記録に残す。全てのカテゴリが失敗して記録が空になったときに、
- * そのガチャで消費した枠を戻す。
+ * ガチャの記録は、**消費を、何回、保持しているか**(`heldCharges`)を持つ。決まりは、次の2つ。
+ * - ガチャに、カテゴリが残っている(成功・処理中)間は、**最低1回の消費を、保持する**。
+ * - 失敗した呼び出しは、自分の分を戻しても、保持が、必要な回数(カテゴリが残っていれば1)を
+ *   下回らないときだけ、戻す。
  *
- * 取得済みのカテゴリの取り直し(`isRefetch`)は、ガチャの最初の消費とは別に、追加で
- * 1回消費している。その取り直しが失敗したら、追加で消費した1回だけを戻す。ガチャの
- * 記録(取得済みのカテゴリ)は、消さない。
+ * これで、グルメ・観光、取り直しが、どの順番で、成功・失敗しても、成功したカテゴリがある間は、
+ * 消費が1回、残る。取り直しで、追加で消費した分は、保持が、必要な回数を超えているため、
+ * 失敗したら、戻る。
  *
- * - `reservationCharged`: 今回の呼び出しで回数を消費したか。
- * - `gachaCharged`: ガチャの記録が、回数を消費済みか(記録がなければundefined)。
- * - `isRefetch`: 今回の消費が、取得済みのカテゴリの取り直しによる、追加の消費か。
- * - `categorySucceeded`: そのカテゴリを、すでに、取得に成功したか。取り直しが失敗した
- *   とき、成功済みなら、取得済みの記録を残す。成功していなければ(最初の取得が処理中・失敗で、
- *   取り直しも失敗)、記録も消す。残すと、別のカテゴリの取得が、利用上限に達していても、
- *   消費なしで通ってしまう。
- * - `othersInFlight`: 同じカテゴリで、今回のほかに、処理中の取得があるか。ある間は、そのカテゴリの
- *   記録を消さず、今回消費した分だけを戻す(処理中の取得が成功したとき、記録が消えていると、
- *   別のカテゴリの取得で、また消費してしまうため)。
+ * - `reservationCharged`: 今回の呼び出しが、回数を消費したか(別カテゴリは、消費しない)。
+ * - `heldCharges`: ガチャの記録が、いま、保持している消費の回数(今回の分を含む)。
+ * - `categorySucceeded`: そのカテゴリを、すでに、取得に成功したか。成功済みのカテゴリは、
+ *   取り直しが失敗しても、記録を残す。
+ * - `othersInFlight`: 同じカテゴリで、今回のほかに、処理中の取得があるか。ある間は、記録を残す。
+ * - 戻り値の`remaining`: 失敗のあとに、ガチャの記録に残すカテゴリ。
  */
 export function planRelease(
   reservationCharged: boolean,
-  gachaCharged: boolean | undefined,
+  heldCharges: number,
   recorded: string[] | undefined,
   category: string,
-  isRefetch = false,
   othersInFlight = false,
   categorySucceeded = false,
 ): { refund: boolean; remaining: string[] } {
-  // 成功済み、または、ほかに処理中の取得があるカテゴリは、記録を消さない。
   const keepCategory = categorySucceeded || othersInFlight;
-  if (isRefetch && reservationCharged) {
-    return {
-      refund: true,
-      remaining: keepCategory ? (recorded ?? []) : removeCategory(recorded, category),
-    };
-  }
-  if (keepCategory) {
-    return { refund: reservationCharged, remaining: recorded ?? [] };
-  }
-  const remaining = removeCategory(recorded, category);
-  if (remaining.length > 0) return { refund: false, remaining };
-  return { refund: reservationCharged || gachaCharged === true, remaining };
+  const remaining = keepCategory ? (recorded ?? []) : removeCategory(recorded, category);
+  // カテゴリが残っていれば、最低1回の消費を、保持する。
+  const needed = remaining.length > 0 ? 1 : 0;
+  // 消費した呼び出しは、自分の分を戻す。消費していない呼び出し(別カテゴリ)は、ガチャとして
+  // 保持している分のうち、必要な回数を超える分を戻す。
+  const refund = reservationCharged ? heldCharges - 1 >= needed : heldCharges > needed;
+  return { refund, remaining };
 }
 
 /**
@@ -380,8 +369,14 @@ export async function reserveUsage(
     : undefined;
   const requestId = randomUUID();
 
+  const deletedRef = deletedAccountRef(uid);
+
   return db.runTransaction(async (tx) => {
     const userSnap = await tx.get(userRef);
+    // 削除済みのアカウントは、断る(削除したユーザーの記録を、作り直さないため)。
+    if ((await tx.get(deletedRef)).exists) {
+      throw new HttpsError("unauthenticated", "サインインが必要です");
+    }
     const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
@@ -419,8 +414,12 @@ export async function reserveUsage(
         : source
           ? monthKeyOf(now)
           : undefined;
+      // ガチャが、保持している消費の回数。古い記録(heldChargesなし)は、消費済みなら1回とみなす。
+      const heldBefore =
+        (existing?.heldCharges as number | undefined) ?? (alreadyCharged ? 1 : 0);
       tx.set(gachaRef, {
         categories: addCategory(recorded, category),
+        heldCharges: heldBefore + (source !== undefined ? 1 : 0),
         // 取得に成功したカテゴリ(markCategorySucceededで記録する)。引き継ぐ。
         categorySucceeded: (existing?.categorySucceeded as string[] | undefined) ?? [],
         // カテゴリごとの、処理中の取得。終わった呼び出し(成功・失敗)が、自分を外す。
@@ -443,8 +442,6 @@ export async function reserveUsage(
     return {
       charged: source !== undefined,
       source,
-      // 取得済みのカテゴリの取り直しで、追加で消費したか。
-      isRefetch: source !== undefined && recorded?.includes(category) === true,
       monthKey: monthKeyOf(now),
       requestId,
     };
@@ -514,9 +511,14 @@ export async function releaseUsage(
     const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
     const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const recorded = gachaSnap?.data()?.categories as string[] | undefined;
-    const gachaCharged = gachaSnap?.exists
-      ? ((gachaSnap.data()?.charged as boolean | undefined) ?? true)
-      : undefined;
+    // ガチャが、保持している消費の回数。古い記録(heldChargesなし)は、消費済みなら1回とみなす。
+    // 記録がない(gachaIdなし)ときは、今回消費した分だけ。
+    const heldCharges = gachaSnap?.exists
+      ? ((gachaSnap.data()?.heldCharges as number | undefined) ??
+        ((gachaSnap.data()?.charged as boolean | undefined) === false ? 0 : 1))
+      : reservation.charged
+        ? 1
+        : 0;
 
     // アカウントが削除されたあとに、遅れて終わった呼び出しは、何も書かない(削除した
     // ユーザーの記録を、作り直さないため)。
@@ -533,10 +535,9 @@ export async function releaseUsage(
 
     const { refund, remaining } = planRelease(
       reservation.charged,
-      gachaCharged,
+      heldCharges,
       recorded,
       category,
-      reservation.isRefetch,
       othersInFlight,
       categorySucceeded,
     );
@@ -578,6 +579,7 @@ export async function releaseUsage(
         // 今回の呼び出しは、終わったので、処理中の一覧から、外す。
         tx.update(gachaRef, {
           categories: remaining,
+          heldCharges: refund ? Math.max(0, heldCharges - 1) : heldCharges,
           [`inFlight.${category}`]: removeInFlight(inFlight, reservation.requestId),
         });
       }

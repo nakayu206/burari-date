@@ -1,3 +1,4 @@
+import { deletedAccountRef } from "./account";
 import { timingSafeEqual } from "node:crypto";
 
 import { getFirestore } from "firebase-admin/firestore";
@@ -223,8 +224,11 @@ export async function saveSubscription(
 ): Promise<boolean> {
   const db = getFirestore();
   const ref = db.collection("users").doc(uid);
+  const deletedRef = deletedAccountRef(uid);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    // 削除済みのアカウントには、保存しない(削除したユーザーの記録を、作り直さないため)。
+    if ((await tx.get(deletedRef)).exists) return false;
     if (!shouldApplySync(snap.data()?.subscriptionSyncedAtMs, info.requestedAtMs)) {
       return false;
     }
