@@ -351,7 +351,7 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'ガチャを、使い放題でお楽しみいただけます。',
+            'ガチャを、無料の回数を超えて、お楽しみいただけます。',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: AppFontSizes.bodyLarge,
@@ -360,6 +360,9 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
+            // 月の目安の上限は、バックエンドのMONTHLY_FAIR_USE_LIMIT(functions/src/fairUse.ts)と
+            // 同じ値にする。実際の内容より有利に見える「使い放題」とは書かない(Issue #216)。
+            '1か月に利用できる回数には、目安の上限(30回)があります。'
             '過度な連続利用など、運営者が不適切と判断した利用があった場合は、'
             '利用規約にもとづき、機能を制限することがあります。',
             style: TextStyle(

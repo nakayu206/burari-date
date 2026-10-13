@@ -146,11 +146,14 @@ void main() {
 
   Finder purchaseButton() => find.widgetWithText(ElevatedButton, '月額300円で購入する');
 
-  testWidgets('プランの案内(価格・使い放題・制限の可能性)を表示する', (tester) async {
+  testWidgets('プランの案内(価格・無料の回数を超えて・月の目安の上限・制限の可能性)を表示する', (tester) async {
     await pumpPage(tester, _FakePurchaseRepository());
 
     expect(find.text('月額300円'), findsOneWidget);
-    expect(find.text('ガチャを、使い放題でお楽しみいただけます。'), findsOneWidget);
+    expect(find.text('ガチャを、無料の回数を超えて、お楽しみいただけます。'), findsOneWidget);
+    // 月の目安の上限を、書く(実際より有利に見える「使い放題」とは、書かない)。
+    expect(find.textContaining('目安の上限(30回)'), findsOneWidget);
+    expect(find.textContaining('使い放題'), findsNothing);
     expect(find.textContaining('機能を制限することがあります'), findsOneWidget);
   });
 
