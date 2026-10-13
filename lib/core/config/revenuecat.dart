@@ -5,9 +5,9 @@
 /// ない。そちらは、バックエンドのSecretにだけ置く)。Google Playのデベロッパー
 /// アカウントの確認と、RevenueCatへのアプリの追加が済んでから、設定する。
 ///
-/// 空の間、リリースのビルドでは、課金を使えない扱いにする(プラン画面は開けるが、
+/// 空のときは、リリースのビルドでは、課金を使えない扱いにする(プラン画面は開けるが、
 /// 購入は「課金の設定が、まだ済んでいません」と案内する)。
-const kRevenueCatAndroidApiKey = '';
+const kRevenueCatAndroidApiKey = 'goog_pWLjIMjVIBmJAsNUzIOyPGFZyJb';
 
 /// RevenueCatの「Test Store」の公開APIキー(`test_`で始まる)。Google Playなしで、
 /// 擬似的な購入を試すためのもの。公開用のキーで、秘密ではない。
