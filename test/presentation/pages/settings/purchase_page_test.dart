@@ -310,7 +310,9 @@ void main() {
       expect(find.text('定期購入を管理する(解約など)'), findsOneWidget);
     });
 
-    testWidgets('解約済みの購読では、「自動で更新されます」と「自動では更新されません」を、同時に出さない', (tester) async {
+    testWidgets('解約済みの購読では、「自動で更新されます」とは、出さず、「更新されず、プランが終了します」を出す', (
+      tester,
+    ) async {
       await pumpPage(
         tester,
         _FakePurchaseRepository(
@@ -319,7 +321,7 @@ void main() {
       );
 
       expect(find.textContaining('自動で更新されます'), findsNothing);
-      expect(find.textContaining('自動では更新されません'), findsOneWidget);
+      expect(find.textContaining('更新されず、プランが終了します'), findsOneWidget);
     });
 
     testWidgets('購入して購読中になったら、購入前の案内は消える', (tester) async {
@@ -350,7 +352,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('自動で更新されます'), findsNothing);
-      expect(find.textContaining('自動では更新されません'), findsOneWidget);
+      expect(find.textContaining('更新されず、プランが終了します'), findsOneWidget);
     });
   });
 
@@ -370,7 +372,7 @@ void main() {
 
       expect(repository.refreshCount, 1);
       expect(find.textContaining('次回の更新日: '), findsNothing);
-      expect(find.text('有効期限: 2026年11月5日(自動では更新されません)'), findsOneWidget);
+      expect(find.text('解約済みです(2026年11月5日まで、ご利用いただけます)'), findsOneWidget);
     });
 
     testWidgets('取り直している間も、読み込み中の表示には戻さない', (tester) async {
@@ -433,12 +435,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.refreshCount, 1);
-      expect(find.text('有効期限: 2026年11月5日(自動では更新されません)'), findsOneWidget);
+      expect(find.text('解約済みです(2026年11月5日まで、ご利用いただけます)'), findsOneWidget);
     });
   });
 
   group('購読中', () {
-    testWidgets('解約済みで、期限で終わるときは、有効期限を出し、更新とは、書かない', (tester) async {
+    testWidgets('解約済みで、期限で終わるときは、見出しで「解約済み」と期限を出し、更新とは、書かない', (tester) async {
       await pumpPage(
         tester,
         _FakePurchaseRepository(
@@ -446,8 +448,27 @@ void main() {
         ),
       );
 
-      expect(find.text('有効期限: 2026年11月5日(自動では更新されません)'), findsOneWidget);
+      expect(find.text('解約済みです(2026年11月5日まで、ご利用いただけます)'), findsOneWidget);
+      expect(find.text('この日を過ぎると、更新されず、プランが終了します。'), findsOneWidget);
+      // 購読中の見出しや、更新の表示は、出さない。
+      expect(find.text('ご利用中のプランです'), findsNothing);
       expect(find.textContaining('次回の更新日:'), findsNothing);
+      // 解約済みでは、再開できることが、ボタンで分かる。
+      expect(find.text('定期購入を管理する(再開など)'), findsOneWidget);
+      expect(find.text('定期購入を管理する(解約など)'), findsNothing);
+    });
+
+    testWidgets('購読中(更新される)のときは、見出しは「ご利用中のプランです」で、ボタンは「解約など」', (tester) async {
+      await pumpPage(
+        tester,
+        _FakePurchaseRepository(
+          SubscriptionStatus.active(renewsOn: DateTime(2026, 11, 5)),
+        ),
+      );
+
+      expect(find.text('ご利用中のプランです'), findsOneWidget);
+      expect(find.textContaining('解約済みです'), findsNothing);
+      expect(find.text('定期購入を管理する(解約など)'), findsOneWidget);
     });
 
     testWidgets('「定期購入を管理する」で、Google Playの定期購入の画面を、外部のアプリで開く', (tester) async {

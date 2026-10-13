@@ -490,13 +490,19 @@ class _ActiveBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final renewsOn = subscription.renewsOn;
     final endsOn = subscription.endsOn;
+    // 解約済み(更新されず、期限まで使える)か。見出しから、購読中と、ひと目で、区別できるように
+    // する(Issue #214)。更新日が分かるときは、購読中として扱う。
+    final isCancelled = renewsOn == null && endsOn != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'ご利用中のプランです',
+        Text(
+          isCancelled
+              ? '解約済みです(${_dateText(endsOn)}まで、ご利用いただけます)'
+              : 'ご利用中のプランです',
           style: TextStyle(
-            color: AppColors.primary,
+            // 購読中は、いつもの強調色。解約済みは、控えめな色にする。
+            color: isCancelled ? AppColors.textSecondary : AppColors.primary,
             fontSize: AppFontSizes.bodyLarge,
             fontWeight: FontWeight.bold,
           ),
@@ -504,15 +510,15 @@ class _ActiveBody extends StatelessWidget {
         if (renewsOn != null) ...[
           const SizedBox(height: AppSpacing.xs),
           _BodyText('次回の更新日: ${_dateText(renewsOn)}(自動で更新されます)'),
-        ] else if (endsOn != null) ...[
+        ] else if (isCancelled) ...[
           // 解約済みで、更新されない。更新と、誤解させない。
           const SizedBox(height: AppSpacing.xs),
-          _BodyText('有効期限: ${_dateText(endsOn)}(自動では更新されません)'),
+          const _BodyText('この日を過ぎると、更新されず、プランが終了します。'),
         ],
         const SizedBox(height: AppSpacing.lg),
         OutlinedButton(
           onPressed: onManage,
-          child: const Text('定期購入を管理する(解約など)'),
+          child: Text(isCancelled ? '定期購入を管理する(再開など)' : '定期購入を管理する(解約など)'),
         ),
       ],
     );
