@@ -7,6 +7,7 @@ import 'app.dart';
 import 'core/config/flavor.dart';
 import 'core/config/terms_version.dart';
 import 'data/datasources/cloud/anonymous_auth.dart';
+import 'data/datasources/cloud/app_check_setup.dart';
 import 'data/repositories/consent_repository_impl.dart';
 import 'firebase_options.dart';
 
@@ -15,11 +16,11 @@ import 'firebase_options.dart';
 Future<void> bootstrap(Flavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConfig.setFlavor(flavor);
-  await _initializeFirebase();
+  await _initializeFirebase(flavor);
   runApp(const ProviderScope(child: BurariDateApp()));
 }
 
-Future<void> _initializeFirebase() async {
+Future<void> _initializeFirebase(Flavor flavor) async {
   final isSupported =
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
@@ -30,6 +31,13 @@ Future<void> _initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // サーバーを呼ぶ前に、正規のアプリであることを証明する仕組みを有効にする(Issue #222)。
+    // 失敗しても、ログインや、アプリの利用は止めない。
+    try {
+      await activateAppCheck(flavor);
+    } catch (e) {
+      debugPrint('App Checkを有効にできませんでした: $e');
+    }
     await signInIfConsented(
       loadAcceptedVersion: ConsentRepositoryImpl().loadAcceptedVersion,
       signIn: AnonymousAuth.instance.ensureUid,
