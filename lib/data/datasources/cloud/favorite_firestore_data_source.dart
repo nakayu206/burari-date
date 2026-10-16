@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'anonymous_auth.dart';
+import '../../../domain/entities/candidate.dart';
 import '../../../domain/entities/favorite.dart';
 
 /// Firestore(users/{uid}/favorites)にお気に入りを保存するデータソース
@@ -37,6 +38,28 @@ class FavoriteFirestoreDataSource {
   Future<void> upsert(Favorite favorite) async {
     final collection = await _collection();
     return collection.doc(favorite.candidateId).set(favorite.toJson());
+  }
+
+  /// 今も保存されていて、まだ仮の説明のお気に入りだけを、AIの紹介文に更新する。
+  /// 更新できたかを返す。解除済みのものは、作り直さない(トランザクションで、
+  /// 更新の直前に存在を確かめる)。
+  Future<bool> refreshDescription(
+    String candidateId,
+    CandidateDescription description,
+  ) async {
+    final doc = (await _collection()).doc(candidateId);
+    return _firestore.runTransaction((tx) async {
+      final snapshot = await tx.get(doc);
+      if (!snapshot.exists) return false;
+      // 保存済みの古いデータには、項目がない(AIの紹介文として扱う)。
+      if (snapshot.data()?['isAiGenerated'] as bool? ?? true) return false;
+      tx.update(doc, {
+        'catchCopy': description.catchCopy,
+        'reason': description.reason,
+        'isAiGenerated': true,
+      });
+      return true;
+    });
   }
 
   Future<void> remove(String candidateId) async {

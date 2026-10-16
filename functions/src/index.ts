@@ -9,6 +9,8 @@ export const ping = onRequest((req, res) => {
 
 export { getCandidates } from "./candidates";
 
+export { describeCandidates } from "./describeCandidates";
+
 export { sendInquiry } from "./sendInquiry";
 
 export { revenueCatWebhook } from "./revenueCatWebhook";

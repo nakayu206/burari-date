@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +9,9 @@ import 'package:burari_date/domain/entities/gacha_result.dart';
 import 'package:burari_date/domain/entities/railway_line.dart';
 import 'package:burari_date/domain/entities/station.dart';
 import 'package:burari_date/domain/repositories/candidate_repository.dart';
+import 'package:burari_date/presentation/pages/gacha/candidate_detail_page.dart';
 import 'package:burari_date/presentation/pages/gacha/candidate_list_page.dart';
+import 'package:burari_date/presentation/widgets/ai_label.dart';
 import 'package:burari_date/presentation/widgets/pixel_icon.dart';
 import 'package:burari_date/presentation/widgets/pixel_icon_data.dart';
 import 'package:burari_date/presentation/providers/auth_providers.dart';
@@ -372,6 +376,121 @@ void main() {
 
       expect(find.text('テスト洋食屋'), findsOneWidget);
       expect(find.textContaining('候補の取得に失敗しました'), findsNothing);
+    });
+
+    const placeholder = Candidate(
+      id: 'c1',
+      category: CandidateCategory.gourmet,
+      name: 'テスト洋食屋',
+      catchCopy: '洋食',
+      reason: '仮の説明',
+      walkMinutes: 3,
+      isAiGenerated: false,
+    );
+
+    testWidgets('店舗情報を先に出し、紹介文は後から差し替わる(作成中はAIの印を出さない)', (tester) async {
+      final completer = Completer<Map<String, CandidateDescription>>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith((ref, args) async => [placeholder]),
+            candidateDescriptionsProvider.overrideWith(
+              (ref, args) => completer.future,
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // 紹介文を待つ間も、店名と徒歩時間は見える。
+      expect(find.text('テスト洋食屋'), findsOneWidget);
+      expect(find.text('駅から徒歩3分'), findsOneWidget);
+      expect(find.text('AIが紹介文を作っています…'), findsOneWidget);
+      expect(find.byType(AiLabel), findsNothing);
+
+      completer.complete({
+        'c1': const CandidateDescription(
+          id: 'c1',
+          catchCopy: 'AIの看板文',
+          reason: 'AIの理由',
+        ),
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('AIの看板文'), findsOneWidget);
+      expect(find.text('AIが紹介文を作っています…'), findsNothing);
+      expect(find.byType(AiLabel), findsOneWidget);
+    });
+
+    testWidgets('紹介文を取得できなくても一覧は使え、取り直せる', (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith((ref, args) async => [placeholder]),
+            candidateDescriptionsProvider.overrideWith((ref, args) async {
+              calls++;
+              if (calls == 1) throw const CandidateFetchException('失敗');
+              return {
+                'c1': const CandidateDescription(
+                  id: 'c1',
+                  catchCopy: 'AIの看板文',
+                  reason: 'AIの理由',
+                ),
+              };
+            }),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('テスト洋食屋'), findsOneWidget);
+      expect(find.text('洋食'), findsOneWidget);
+      expect(find.byType(AiLabel), findsNothing);
+
+      await tester.tap(find.text('AIの紹介文を取得し直す'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('AIの看板文'), findsOneWidget);
+      expect(find.text('AIの紹介文を取得し直す'), findsNothing);
+    });
+
+    testWidgets('紹介文が付く前に詳細を開いても、あとから届いた紹介文に差し替わる', (tester) async {
+      final completer = Completer<Map<String, CandidateDescription>>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            candidatesProvider.overrideWith((ref, args) async => [placeholder]),
+            candidateDescriptionsProvider.overrideWith(
+              (ref, args) => completer.future,
+            ),
+          ],
+          child: MaterialApp(home: CandidateListPage(result: result)),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('テスト洋食屋'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CandidateDetailPage), findsOneWidget);
+      expect(find.text('仮の説明'), findsOneWidget);
+
+      completer.complete({
+        'c1': const CandidateDescription(
+          id: 'c1',
+          catchCopy: 'AIの看板文',
+          reason: 'AIの理由',
+        ),
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('AIの看板文'), findsOneWidget);
+      expect(find.text('AIの理由'), findsOneWidget);
+      expect(find.text('仮の説明'), findsNothing);
     });
   });
 }

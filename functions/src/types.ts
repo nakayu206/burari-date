@@ -15,6 +15,7 @@ export interface RawPlace {
 
 /** クライアントの Candidate エンティティと対応するレスポンス形式 */
 export interface Candidate {
+  isAiGenerated?: boolean;
   id: string;
   category: CandidateCategory;
   name: string;

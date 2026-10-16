@@ -46,6 +46,9 @@ class CandidateLimitException extends CandidateFetchException {
 /// 要約・キャッチコピー生成させる(仕様書 5.2 処理フロー / 5.4 ハルシネー
 /// ション対策)。
 abstract interface class CandidateRepository {
+  /// 店舗・観光地の情報だけを返す(AIの紹介文は含まない。仮の文言が入っている)。
+  /// 紹介文は[describeCandidates]で後から付ける。
+  ///
   /// [gachaId]は1回のガチャを識別するID。同じガチャのグルメ・観光の取得を、
   /// 無料枠で1回と数えるためにバックエンドへ渡す。
   ///
@@ -54,6 +57,16 @@ abstract interface class CandidateRepository {
   Future<List<Candidate>> getCandidates(
     Station arrival,
     CandidateCategory category, {
+    required String gachaId,
+    AiPreference? preference,
+  });
+
+  /// [getCandidates]で取得した[candidates]に、AIの紹介文を付ける。一覧を先に出した
+  /// あとの後追いで呼ぶ。利用枠は、[getCandidates]で数え済みのため、数えない。
+  Future<List<CandidateDescription>> describeCandidates(
+    Station arrival,
+    CandidateCategory category,
+    List<Candidate> candidates, {
     required String gachaId,
     AiPreference? preference,
   });

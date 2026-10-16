@@ -110,7 +110,8 @@ class CandidateDetailPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             // キャッチコピーとおすすめ理由は、AIが作った文章。店舗情報と区別する。
-            const Align(alignment: Alignment.centerLeft, child: AiLabel()),
+            if (candidate.isAiGenerated)
+              const Align(alignment: Alignment.centerLeft, child: AiLabel()),
             const SizedBox(height: AppSpacing.sm),
             Text(
               candidate.catchCopy,

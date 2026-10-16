@@ -5,6 +5,9 @@ import type { RawPlace } from "./types";
 /** Foursquare Places API(観光・レジャー施設検索、Issue #3・#28) */
 export const foursquareApiKey = defineSecret("FOURSQUARE_API_KEY");
 
+/** 外部APIの応答を待つ上限。超えたら中止して失敗にする(利用枠は、呼び出し元が戻す) */
+const SEARCH_TIMEOUT_MS = 15_000;
+
 const API_VERSION = "2025-06-17";
 
 /**
@@ -41,6 +44,7 @@ export async function searchSightseeing(
   url.searchParams.set("fsq_category_ids", SIGHTSEEING_CATEGORY_IDS.join(","));
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${foursquareApiKey.value()}`,
       "X-Places-Api-Version": API_VERSION,

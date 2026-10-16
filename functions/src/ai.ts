@@ -9,6 +9,8 @@ export const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_RESULTS = 5;
 
+/** Claudeの応答を待つ上限。超えたら中止して失敗にする(利用枠は、呼び出し元が戻す) */
+const AI_TIMEOUT_MS = 40_000;
 interface Pick {
   index: number;
   catchCopy: string;
@@ -25,8 +27,54 @@ export async function generateCandidates(
 
   const targets = rawPlaces.slice(0, 20);
   const prompt = buildPrompt(stationName, category, targets, preference);
+  const text = await callClaude(prompt);
+  return requireCandidates(toCandidates(parsePicks(text), targets, category));
+}
 
+/** 紹介文(キャッチコピー・おすすめ理由)。 */
+export interface Description {
+  id: string;
+  catchCopy: string;
+  reason: string;
+}
+
+/**
+ * すでに選ばれた場所(最大5件)に、紹介文だけを付ける。場所は選び直さない。
+ * 一覧を先に出したあとの後追いで呼ぶため、失敗しても利用者の画面は壊れない。
+ */
+export async function describePlaces(
+  stationName: string,
+  category: CandidateCategory,
+  places: RawPlace[],
+  preference?: Preference,
+): Promise<Description[]> {
+  if (places.length === 0) return [];
+  const text = await callClaude(
+    buildDescribePrompt(stationName, category, places, preference),
+  );
+  const seen = new Set<number>();
+  const descriptions = parsePicks(text)
+    .filter(({ index, catchCopy, reason }) => {
+      if (seen.has(index) || !places[index]) return false;
+      if (catchCopy.trim() === "" || reason.trim() === "") return false;
+      seen.add(index);
+      return true;
+    })
+    .map(({ index, catchCopy, reason }) => ({
+      id: places[index].id,
+      catchCopy,
+      reason,
+    }));
+  // 一部の場所に紹介文がないまま成功にすると、アプリが取り直せないため、失敗として投げる。
+  if (descriptions.length < places.length) {
+    throw new Error("Claude APIの応答に、全件の紹介文が含まれていませんでした");
+  }
+  return descriptions;
+}
+
+async function callClaude(prompt: string): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
+    signal: AbortSignal.timeout(AI_TIMEOUT_MS),
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -45,8 +93,7 @@ export async function generateCandidates(
   const body = (await res.json()) as {
     content?: { type: string; text?: string }[];
   };
-  const text = extractText(body);
-  return requireCandidates(toCandidates(parsePicks(text), targets, category));
+  return extractText(body);
 }
 
 /**
@@ -165,6 +212,36 @@ ${stationName}周辺の${categoryLabel}の実データが以下のJSONで与え�
 この中から、デートに向いていそうな場所を最大${MAX_RESULTS}件選び、
 それぞれに短いキャッチコピー(15文字程度)とおすすめ理由(40文字程度)を日本語で書いてください。
 ${sightseeingNote}${buildPreferenceNote(category, preference)}
+店名・住所などの事実情報は絶対に創作せず、与えられたデータのみを使ってください。
+
+データ:
+${JSON.stringify(data)}
+
+以下のJSON配列の形式のみで出力してください(説明文は不要):
+[{"index": 0, "catchCopy": "...", "reason": "..."}]`;
+}
+
+export function buildDescribePrompt(
+  stationName: string,
+  category: CandidateCategory,
+  places: RawPlace[],
+  preference?: Preference,
+): string {
+  const categoryLabel = category === "gourmet" ? "飲食店" : "観光・レジャー施設";
+  const mood = preference?.mood
+    ? `
+ユーザーの好みの雰囲気(${preference.mood})を意識した文章にしてください。ただし、データにない事実は断定しないでください。`
+    : "";
+  const data = places.map((place, index) => ({
+    index,
+    name: place.name,
+    address: place.address ?? null,
+    category: place.categoryName ?? null,
+    budget: place.budget ?? null,
+  }));
+  return `あなたは日本のデートスポット案内アシスタントです。
+${stationName}周辺の${categoryLabel}の実データが以下のJSONで与えられます。
+すべての場所について、短いキャッチコピー(15文字程度)とおすすめ理由(40文字程度)を日本語で書いてください。場所を選び直したり、減らしたりしないでください。${mood}
 店名・住所などの事実情報は絶対に創作せず、与えられたデータのみを使ってください。
 
 データ:

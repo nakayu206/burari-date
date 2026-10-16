@@ -16,9 +16,13 @@ class Candidate {
     this.longitude,
     this.categoryName,
     this.budget,
+    this.isAiGenerated = true,
   });
 
   final String id;
+
+  /// 紹介文がAIの生成か。紹介文が付く前の、実データだけの仮の表示はfalse。
+  final bool isAiGenerated;
   final CandidateCategory category;
   final String name;
 
@@ -42,4 +46,37 @@ class Candidate {
 
   /// 予算の目安(ホットペッパーの平均ディナー予算。飲食店のみ)。
   final String? budget;
+
+  /// AIの紹介文に差し替えた候補を返す。店舗情報(店名・住所など)は変えない。
+  Candidate withDescription(CandidateDescription description) {
+    return Candidate(
+      id: id,
+      category: category,
+      name: name,
+      catchCopy: description.catchCopy,
+      reason: description.reason,
+      walkMinutes: walkMinutes,
+      address: address,
+      imageUrl: imageUrl,
+      latitude: latitude,
+      longitude: longitude,
+      categoryName: categoryName,
+      budget: budget,
+      isAiGenerated: true,
+    );
+  }
+}
+
+/// 一覧を先に出したあとで、後から付く、AIの紹介文(キャッチコピー・おすすめ理由)。
+class CandidateDescription {
+  const CandidateDescription({
+    required this.id,
+    required this.catchCopy,
+    required this.reason,
+  });
+
+  /// 紹介文を付ける[Candidate.id]。
+  final String id;
+  final String catchCopy;
+  final String reason;
 }

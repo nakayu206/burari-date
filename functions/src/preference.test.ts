@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildPreferenceNote, buildPrompt } from "./ai";
-import { parsePreference, prioritizeByGenres } from "./preference";
+import { parseBudgetYen, parsePreference, prioritizeByGenres, prioritizeByPreference } from "./preference";
 import type { RawPlace } from "./types";
 
 const places: RawPlace[] = [{ id: "a", name: "テスト食堂" }];
@@ -154,4 +154,45 @@ test("AIに渡すデータに、予算の目安を含める", () => {
     { id: "a", name: "テスト食堂", budget: "900円", categoryName: "和食" },
   ]);
   assert.ok(prompt.includes('"budget":"900円"'));
+});
+
+test("予算の文言から、最初の金額を読む", () => {
+  assert.equal(parseBudgetYen("900円"), 900);
+  assert.equal(parseBudgetYen("1001~1500円"), 1001);
+  assert.equal(parseBudgetYen("3,000円"), 3000);
+  assert.equal(parseBudgetYen(undefined), undefined);
+  assert.equal(parseBudgetYen("不明"), undefined);
+});
+
+test("予算が安めの好みなら、安い店を前に、不明な店をその次にする(距離順は保つ)", () => {
+  const shops = [
+    { id: "high", budget: "5000円" },
+    { id: "unknown" },
+    { id: "low1", budget: "1500円" },
+    { id: "low2", budget: "800円" },
+  ];
+  const result = prioritizeByPreference(shops, { genres: [], budget: "安め" });
+  assert.deepEqual(result.map((s) => s.id), ["low1", "low2", "unknown", "high"]);
+});
+
+test("予算が高めの好みなら、高い店を前にする", () => {
+  const shops = [{ id: "low", budget: "1000円" }, { id: "high", budget: "6000円" }];
+  const result = prioritizeByPreference(shops, { genres: [], budget: "高め" });
+  assert.deepEqual(result.map((s) => s.id), ["high", "low"]);
+});
+
+test("ジャンルを予算より優先し、予算が普通・未指定なら順序を変えない", () => {
+  const shops = [
+    { id: "cheap-other", categoryName: "洋食", budget: "800円" },
+    { id: "pricey-match", categoryName: "和食", budget: "6000円" },
+  ];
+  assert.deepEqual(
+    prioritizeByPreference(shops, { genres: ["和食"], budget: "安め" }).map((s) => s.id),
+    ["pricey-match", "cheap-other"],
+  );
+  assert.deepEqual(
+    prioritizeByPreference(shops, { genres: [], budget: "普通" }).map((s) => s.id),
+    ["cheap-other", "pricey-match"],
+  );
+  assert.equal(prioritizeByPreference(shops, undefined), shops);
 });
