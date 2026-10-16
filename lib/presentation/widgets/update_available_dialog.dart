@@ -53,23 +53,28 @@ class _UpdateAvailableDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            Text(
-              '新しいバージョンがあります',
-              textAlign: TextAlign.center,
-              // ホームやガチャ演出と同じ、ポップな書体で、見せ場の見出しにする。
-              style: GoogleFonts.mochiyPopOne(
-                color: AppColors.primary,
-                fontSize: AppFontSizes.titleMedium,
+            // 文字は左揃え。電車の絵とボタンは、中央に置く。
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                '新しいバージョンがあります',
+                // ホームやガチャ演出と同じ、ポップな書体で、見せ場の見出しにする。
+                style: GoogleFonts.mochiyPopOne(
+                  color: AppColors.primary,
+                  fontSize: AppFontSizes.titleMedium,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            const Text(
-              '更新してください。\n新しい機能や、改善が、使えるようになります。',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: AppFontSizes.bodyMedium,
-                height: 1.6,
+            const SizedBox(
+              width: double.infinity,
+              child: Text(
+                '更新してください。\n新しい機能や、改善が、使えるようになります。',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: AppFontSizes.bodyMedium,
+                  height: 1.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.x2l),

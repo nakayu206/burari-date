@@ -99,5 +99,25 @@ void main() {
         );
       }
     });
+
+    testWidgets('見出しと本文は左揃えで、ボタンは中央に置く', (tester) async {
+      await open(tester);
+
+      final title = find.text('新しいバージョンがあります');
+      final body = find.textContaining('更新してください');
+      final dialog = tester.getRect(find.byType(Dialog));
+
+      // 見出しと本文の左端がそろい、ダイアログの左側に寄っている。
+      expect(tester.getTopLeft(title).dx, tester.getTopLeft(body).dx);
+      expect(
+        tester.getTopLeft(title).dx - dialog.left,
+        lessThan(dialog.width / 4),
+      );
+      // ボタンは、ダイアログの中央に置く。
+      expect(
+        tester.getCenter(find.byType(ElevatedButton)).dx,
+        closeTo(dialog.center.dx, 1),
+      );
+    });
   });
 }
