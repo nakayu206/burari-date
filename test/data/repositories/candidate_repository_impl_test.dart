@@ -381,5 +381,62 @@ void main() {
         ),
       );
     });
+
+    test('候補の取得は、AIの紹介文を待たない段階(phase: places)で依頼する', () async {
+      Map<String, dynamic>? sent;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async {
+          sent = data;
+          return {'candidates': []};
+        },
+      );
+
+      await repository.getCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        gachaId: 'g1',
+      );
+
+      expect(sent!['phase'], 'places');
+    });
+
+    test('紹介文の取得は、場所を送らず(サーバーが保存した場所を使う)、返ってきた紹介文を読む', () async {
+      Map<String, dynamic>? sent;
+      final repository = CandidateRepositoryImpl(
+        callable: (data) async => {'candidates': []},
+        describeCallable: (data) async {
+          sent = data;
+          return {
+            'descriptions': [
+              {'id': 'c1', 'catchCopy': '看板', 'reason': '理由'},
+            ],
+          };
+        },
+      );
+
+      final result = await repository.describeCandidates(
+        arrival,
+        CandidateCategory.gourmet,
+        const [
+          Candidate(
+            id: 'c1',
+            category: CandidateCategory.gourmet,
+            name: 'テスト食堂',
+            catchCopy: '仮',
+            reason: '仮',
+            walkMinutes: 3,
+            address: '東京都',
+            latitude: 35.0,
+            longitude: 139.0,
+          ),
+        ],
+        gachaId: 'g1',
+      );
+
+      expect(sent!['gachaId'], 'g1');
+      expect(sent!.containsKey('places'), isFalse);
+      expect(result.single.id, 'c1');
+      expect(result.single.catchCopy, '看板');
+    });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:burari_date/domain/entities/account_status.dart';
+import 'package:burari_date/domain/entities/candidate.dart';
 import 'package:burari_date/domain/entities/favorite.dart';
 import 'package:burari_date/domain/entities/gacha_history_entry.dart';
 import 'package:burari_date/domain/repositories/account_repository.dart';
@@ -53,6 +54,12 @@ class _CountingFavoriteRepository implements FavoriteRepository {
 
   @override
   Future<void> addFavorite(Favorite favorite) async {}
+
+  @override
+  Future<bool> refreshDescription(
+    String candidateId,
+    CandidateDescription description,
+  ) async => false;
 
   @override
   Future<void> removeFavorite(String candidateId) async {}

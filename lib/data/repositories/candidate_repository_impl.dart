@@ -11,15 +11,22 @@ import '../../domain/repositories/candidate_repository.dart';
 typedef CandidatesCallable =
     Future<Map<String, dynamic>> Function(Map<String, dynamic> data);
 
+/// 紹介文の取得(`describeCandidates`)の注入ポイント。
+typedef DescribeCallable = CandidatesCallable;
+
 /// バックエンド(Firebase Functions)の`getCandidates`を呼び出し、外部API
 /// (ホットペッパー/Foursquare)の実データをAIが要約した候補を取得する
 /// (Issue #3, #4)。
 class CandidateRepositoryImpl implements CandidateRepository {
   CandidateRepositoryImpl({
     CandidatesCallable? callable,
+    DescribeCallable? describeCallable,
     Future<void> Function()? ensureSignedIn,
     Future<String?> Function()? deviceId,
   }) : _callable = callable ?? _defaultCallable,
+       _describeCallable =
+           describeCallable ??
+           (callable == null ? _defaultDescribeCallable : _noDescriptions),
        // 注入した[callable](テスト)のときは、端末の保存領域には触れない。
        _deviceId =
            deviceId ?? (callable == null ? _defaultDeviceId : _noDeviceId),
@@ -29,6 +36,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
            (callable == null ? _defaultEnsureSignedIn : _noSignIn);
 
   final CandidatesCallable _callable;
+  final DescribeCallable _describeCallable;
 
   /// 呼び出しの前に、ログインをやり直せるようにするための注入ポイント(Issue #105)。
   final Future<void> Function() _ensureSignedIn;
@@ -61,9 +69,22 @@ class CandidateRepositoryImpl implements CandidateRepository {
 
   static Future<Map<String, dynamic>> _defaultCallable(
     Map<String, dynamic> data,
+  ) => _call('getCandidates', data);
+
+  static Future<Map<String, dynamic>> _defaultDescribeCallable(
+    Map<String, dynamic> data,
+  ) => _call('describeCandidates', data);
+
+  static Future<Map<String, dynamic>> _noDescriptions(
+    Map<String, dynamic> data,
+  ) async => {'descriptions': []};
+
+  static Future<Map<String, dynamic>> _call(
+    String name,
+    Map<String, dynamic> data,
   ) async {
     final callable = FirebaseFunctions.instance.httpsCallable(
-      'getCandidates',
+      name,
       options: HttpsCallableOptions(timeout: callTimeout),
     );
     final result = await callable.call<Map<String, dynamic>>(data);
@@ -100,9 +121,9 @@ class CandidateRepositoryImpl implements CandidateRepository {
         'latitude': latitude,
         'longitude': longitude,
         'stationName': arrival.name,
-        'category': category == CandidateCategory.gourmet
-            ? 'gourmet'
-            : 'sightseeing',
+        'category': _categoryName(category),
+        // AIの紹介文は待たず、店舗情報だけを先に受け取る(紹介文は後から取得する)。
+        'phase': 'places',
         // 同じガチャのグルメ・観光を、無料枠で1回と数えるためのID。
         'gachaId': gachaId,
         // ログアウトで無料枠が数え直されないよう、端末ごとにも数える(再インストールは、バックアップの復元しだい)。
@@ -131,6 +152,54 @@ class CandidateRepositoryImpl implements CandidateRepository {
         .toList();
   }
 
+  static String _categoryName(CandidateCategory category) =>
+      category == CandidateCategory.gourmet ? 'gourmet' : 'sightseeing';
+
+  @override
+  Future<List<CandidateDescription>> describeCandidates(
+    Station arrival,
+    CandidateCategory category,
+    List<Candidate> candidates, {
+    required String gachaId,
+    AiPreference? preference,
+  }) async {
+    if (candidates.isEmpty) return const [];
+    try {
+      await _ensureSignedIn();
+    } catch (_) {
+      throw const CandidateFetchException(
+        'サインインできませんでした。通信状況を確認して、もう一度お試しください',
+      );
+    }
+
+    Map<String, dynamic> data;
+    try {
+      data = await _describeCallable({
+        'category': _categoryName(category),
+        'gachaId': gachaId,
+        // 紹介文の対象(場所・駅名)は、サーバーが先の取得で残した値を使う(送らない)。
+        if (preference != null)
+          'preference': {
+            'genres': preference.genres.toList(),
+            'budget': preference.budget,
+            'mood': preference.mood,
+          },
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw CandidateFetchException(e.message ?? '紹介文の取得に失敗しました');
+    }
+
+    final raw = data['descriptions'] as List<dynamic>? ?? [];
+    return [
+      for (final item in raw.cast<Map<String, dynamic>>())
+        CandidateDescription(
+          id: item['id'] as String,
+          catchCopy: item['catchCopy'] as String,
+          reason: item['reason'] as String,
+        ),
+    ];
+  }
+
   /// エラーの`details`から上限の種類を読む。種類が取れない(古いバックエンド
   /// など)場合は、無料枠の上限として扱う。
   static LimitKind _limitKindOf(Object? details) {
@@ -155,6 +224,7 @@ class CandidateRepositoryImpl implements CandidateRepository {
       longitude: (json['longitude'] as num?)?.toDouble(),
       categoryName: json['categoryName'] as String?,
       budget: json['budget'] as String?,
+      isAiGenerated: json['isAiGenerated'] as bool? ?? true,
     );
   }
 }

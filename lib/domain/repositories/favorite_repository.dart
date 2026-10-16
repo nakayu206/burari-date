@@ -1,3 +1,4 @@
+import '../entities/candidate.dart';
 import '../entities/favorite.dart';
 
 /// お気に入り候補の永続化を抽象化する(仕様書 6.1 Favorite)。
@@ -7,6 +8,13 @@ abstract interface class FavoriteRepository {
 
   /// 候補をお気に入りに追加する。既に同じcandidateIdが保存済みの場合は上書きする。
   Future<void> addFavorite(Favorite favorite);
+
+  /// 今も保存されていて、まだ仮の説明のお気に入りだけを、AIの紹介文に更新する。
+  /// 更新したかを返す。解除済みのものは、作り直さない。
+  Future<bool> refreshDescription(
+    String candidateId,
+    CandidateDescription description,
+  );
 
   /// お気に入りを解除する。
   Future<void> removeFavorite(String candidateId);

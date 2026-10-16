@@ -1,10 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { extractText, parsePicks, requireCandidates, toCandidates } from "./ai";
+import { anthropicApiKey, describePlaces, generateCandidates, extractText, parsePicks, requireCandidates, toCandidates } from "./ai";
 import type { RawPlace } from "./types";
 
 const place = (id: string): RawPlace => ({ id, name: id });
+
+test("AIの応答は生成結果として返し、障害は握りつぶさない", async (t) => {
+  t.mock.method(anthropicApiKey, "value", () => "test-key");
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({
+    content: [{ type: "text", text: '[{"index":0,"catchCopy":"紹介文","reason":"理由"}]' }],
+  })));
+  const [candidate] = await generateCandidates("駅", "sightseeing", [place("park")]);
+  assert.equal(candidate.catchCopy, "紹介文");
+  fetchMock.mock.mockImplementation(async () => new Response("error", { status: 503 }));
+  await assert.rejects(generateCandidates("駅", "gourmet", [place("a")]), /503/);
+});
+
+test("周辺施設が0件ならAIを呼ばない", async (t) => {
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => { throw new Error("unexpected"); });
+  assert.deepEqual(await generateCandidates("駅", "gourmet", []), []);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
 
 test("正しいJSON配列をパースできる", () => {
   const picks = parsePicks(
@@ -100,4 +117,40 @@ test("候補が1件でもあれば、そのまま返す", () => {
   const picks = parsePicks('[{"index": 0, "catchCopy": "a", "reason": "b"}]');
   const candidates = toCandidates(picks, [place("a")], "gourmet");
   assert.equal(requireCandidates(candidates).length, 1);
+});
+
+test("紹介文は、渡した場所のidに対応づけて返し、範囲外・重複の番号は捨てる", async (t) => {
+  t.mock.method(anthropicApiKey, "value", () => "test-key");
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({
+    content: [{ type: "text", text: '[{"index":1,"catchCopy":"b","reason":"B"},{"index":1,"catchCopy":"dup","reason":"x"},{"index":9,"catchCopy":"z","reason":"x"},{"index":0,"catchCopy":"a","reason":"A"}]' }],
+  })));
+  const result = await describePlaces("駅", "gourmet", [place("p0"), place("p1")]);
+  assert.deepEqual(result, [
+    { id: "p1", catchCopy: "b", reason: "B" },
+    { id: "p0", catchCopy: "a", reason: "A" },
+  ]);
+});
+
+test("紹介文を付ける場所が0件なら、AIを呼ばない", async (t) => {
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => { throw new Error("unexpected"); });
+  assert.deepEqual(await describePlaces("駅", "gourmet", []), []);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test("紹介文が一部の場所に足りない・空のときは、成功にせず失敗として投げる", async (t) => {
+  t.mock.method(anthropicApiKey, "value", () => "test-key");
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({
+    content: [{ type: "text", text: '[{"index":0,"catchCopy":"a","reason":"A"}]' }],
+  })));
+  await assert.rejects(describePlaces("駅", "gourmet", [place("p0"), place("p1")]), /全件/);
+
+  fetchMock.mock.mockImplementation(async () => new Response(JSON.stringify({
+    content: [{ type: "text", text: '[{"index":0,"catchCopy":"","reason":"A"}]' }],
+  })));
+  await assert.rejects(describePlaces("駅", "gourmet", [place("p0")]), /全件/);
+
+  fetchMock.mock.mockImplementation(async () => new Response(JSON.stringify({
+    content: [{ type: "text", text: "[]" }],
+  })));
+  await assert.rejects(describePlaces("駅", "gourmet", [place("p0")]), /全件/);
 });

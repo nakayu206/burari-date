@@ -19,6 +19,7 @@ class Favorite {
     this.longitude,
     this.categoryName,
     this.budget,
+    this.isAiGenerated = true,
   });
 
   factory Favorite.fromCandidate(Candidate candidate) {
@@ -36,6 +37,7 @@ class Favorite {
       longitude: candidate.longitude,
       categoryName: candidate.categoryName,
       budget: candidate.budget,
+      isAiGenerated: candidate.isAiGenerated,
     );
   }
 
@@ -54,6 +56,7 @@ class Favorite {
       longitude: longitude,
       categoryName: categoryName,
       budget: budget,
+      isAiGenerated: isAiGenerated,
     );
   }
 
@@ -73,12 +76,14 @@ class Favorite {
       // 保存済みの古いデータにはないため、nullを許す。
       categoryName: json['categoryName'] as String?,
       budget: json['budget'] as String?,
+      isAiGenerated: json['isAiGenerated'] as bool? ?? true,
     );
   }
 
   /// 保存元の[Candidate.id]。お気に入りの一意なキーとしても使う
   /// (同じ候補を重複保存させない)。
   final String candidateId;
+  final bool isAiGenerated;
   final CandidateCategory category;
   final String name;
   final String catchCopy;
@@ -107,6 +112,7 @@ class Favorite {
       'longitude': longitude,
       'categoryName': categoryName,
       'budget': budget,
+      'isAiGenerated': isAiGenerated,
     };
   }
 }

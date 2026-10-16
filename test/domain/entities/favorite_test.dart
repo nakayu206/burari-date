@@ -5,6 +5,23 @@ import 'package:burari_date/domain/entities/favorite.dart';
 
 void main() {
   group('Favorite', () {
+    test('AIを待たずに表示した候補は保存して開き直してもAI紹介にしない', () {
+      const candidate = Candidate(
+        id: 'fallback',
+        category: CandidateCategory.gourmet,
+        name: '実在の店舗',
+        catchCopy: '中華',
+        reason: '駅周辺のスポット',
+        walkMinutes: 3,
+        isAiGenerated: false,
+      );
+      final restored = Favorite.fromJson(
+        Favorite.fromCandidate(candidate).toJson(),
+      ).toCandidate();
+      expect(restored.isAiGenerated, isFalse);
+      expect(restored.name, candidate.name);
+    });
+
     test('fromCandidateは候補のスナップショットを複製する', () {
       const candidate = Candidate(
         id: 'c1',

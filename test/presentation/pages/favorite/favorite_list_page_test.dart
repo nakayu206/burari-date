@@ -25,6 +25,12 @@ class _FailingFavoriteRepository implements FavoriteRepository {
   Future<void> addFavorite(Favorite favorite) async {}
 
   @override
+  Future<bool> refreshDescription(
+    String candidateId,
+    CandidateDescription description,
+  ) async => false;
+
+  @override
   Future<void> removeFavorite(String candidateId) {
     throw Exception('boom');
   }

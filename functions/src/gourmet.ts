@@ -5,8 +5,14 @@ import type { RawPlace } from "./types";
 /** ホットペッパーグルメAPI(飲食店検索、Issue #3・#28) */
 export const hotpepperApiKey = defineSecret("HOTPEPPER_API_KEY");
 
-/** 1回の検索で取得する飲食店の件数(ホットペッパーグルメAPIの上限) */
+/** 外部APIの応答を待つ上限。超えたら中止して失敗にする(利用枠は、呼び出し元が戻す) */
+const SEARCH_TIMEOUT_MS = 15_000;
+
+/** 好みのジャンルを優先するときに取得する飲食店の件数(ホットペッパーグルメAPIの上限) */
 const GOURMET_FETCH_COUNT = 100;
+
+/** 好みのジャンルがないときの件数。AIに渡す件数(ai.tsの20件)で足りるため、応答を小さくする */
+const GOURMET_DEFAULT_COUNT = 20;
 
 interface RawHotPepperShop {
   id: string;
@@ -22,6 +28,7 @@ interface RawHotPepperShop {
 export async function searchGourmet(
   lat: number,
   lng: number,
+  prioritizeGenres = true,
 ): Promise<RawPlace[]> {
   const url = new URL("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/");
   url.searchParams.set("key", hotpepperApiKey.value());
@@ -30,10 +37,10 @@ export async function searchGourmet(
   url.searchParams.set("range", "3");
   // 位置検索では距離順に固定される。好みのジャンルを優先できるよう、AIに渡す
   // 件数(ai.tsで絞る)より多めに取得する(APIの上限は100件)。
-  url.searchParams.set("count", String(GOURMET_FETCH_COUNT));
+  url.searchParams.set("count", String(prioritizeGenres ? GOURMET_FETCH_COUNT : GOURMET_DEFAULT_COUNT));
   url.searchParams.set("format", "json");
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`ホットペッパーグルメAPI呼び出しに失敗しました: ${res.status}`);
   }

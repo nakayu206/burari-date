@@ -1,3 +1,4 @@
+import '../../domain/entities/candidate.dart';
 import '../../domain/entities/favorite.dart';
 import '../../domain/repositories/favorite_repository.dart';
 import '../datasources/cloud/favorite_firestore_data_source.dart';
@@ -13,6 +14,12 @@ class FavoriteRepositoryImpl implements FavoriteRepository {
 
   @override
   Future<void> addFavorite(Favorite favorite) => _dataSource.upsert(favorite);
+
+  @override
+  Future<bool> refreshDescription(
+    String candidateId,
+    CandidateDescription description,
+  ) => _dataSource.refreshDescription(candidateId, description);
 
   @override
   Future<void> removeFavorite(String candidateId) =>

@@ -32,6 +32,56 @@ export function prioritizeByGenres<T extends { categoryName?: string }>(
   return [...places.filter(matches), ...places.filter((p) => !matches(p))];
 }
 
+/** 予算の目安(平均ディナー予算の円)が、好みの予算感に合うかの境目 */
+const BUDGET_LOW_MAX = 2000;
+const BUDGET_HIGH_MIN = 4000;
+
+/**
+ * 予算の文言(「900円」「1001~1500円」など)から、金額(最初の数字)を読む。
+ * 読めなければundefined。
+ */
+export function parseBudgetYen(text: string | undefined): number | undefined {
+  const m = text?.replace(/,/g, "").match(/\d+/);
+  return m ? Number(m[0]) : undefined;
+}
+
+/** 0=好みの予算感に合う(または、予算の好みなし)、1=予算が不明、2=合わない */
+function budgetRank(budget: string | undefined, preferred: string | undefined): number {
+  // 「普通」は、極端に安い・高いを避ける指定ではないため、順序を変えない。
+  if (!preferred || preferred === "普通") return 0;
+  const yen = parseBudgetYen(budget);
+  if (yen === undefined) return 1;
+  if (preferred === "安め") return yen <= BUDGET_LOW_MAX ? 0 : 2;
+  return yen >= BUDGET_HIGH_MIN ? 0 : 2; // 高め
+}
+
+/**
+ * 好み(ジャンル・予算感)に合う飲食店を先頭に並べ替える。ジャンルを優先し、同じ
+ * ジャンルの中で、予算感に合う店を前にする。元の順序(距離順)は、同順位の中で保つ。
+ * AIは紹介文だけを書くため、AIに渡す前に、ここで一覧に出す候補を決める。
+ */
+export function prioritizeByPreference<
+  T extends { categoryName?: string; budget?: string },
+>(places: T[], preference: Preference | undefined): T[] {
+  if (!preference) return places;
+  const genres = preference.genres;
+  const genreRank = (place: T) =>
+    genres.length === 0 ||
+    (place.categoryName !== undefined &&
+      genres.some((genre) => place.categoryName!.includes(genre)))
+      ? 0
+      : 1;
+  return places
+    .map((place, index) => ({
+      place,
+      index,
+      genre: genreRank(place),
+      budget: budgetRank(place.budget, preference.budget),
+    }))
+    .sort((a, b) => a.genre - b.genre || a.budget - b.budget || a.index - b.index)
+    .map(({ place }) => place);
+}
+
 /**
  * リクエストのpreferenceを検証して取り出す。未指定・形式不正・有効な値が
  * 1つもない場合はundefinedを返し、従来どおりの(好みを使わない)提案にする。

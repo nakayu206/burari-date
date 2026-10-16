@@ -420,13 +420,16 @@ export async function reserveUsage(
   const deletedRef = deletedAccountRef(uid);
 
   return db.runTransaction(async (tx) => {
-    const userSnap = await tx.get(userRef);
+    // 読み取りは、1回の通信でまとめて行う(関数とFirestoreの間の往復を減らすため)。
+    const refs = [userRef, deletedRef, ...(deviceRef ? [deviceRef] : []), ...(gachaRef ? [gachaRef] : [])];
+    const snaps = await tx.getAll(...refs);
+    const [userSnap, deletedSnap] = snaps;
+    const deviceSnap = deviceRef ? snaps[2] : undefined;
+    const gachaSnap = gachaRef ? snaps[deviceRef ? 3 : 2] : undefined;
     // 削除済みのアカウントは、断る(削除したユーザーの記録を、作り直さないため)。
-    if ((await tx.get(deletedRef)).exists) {
+    if (deletedSnap.exists) {
       throw new HttpsError("unauthenticated", "サインインが必要です");
     }
-    const deviceSnap = deviceRef ? await tx.get(deviceRef) : undefined;
-    const gachaSnap = gachaRef ? await tx.get(gachaRef) : undefined;
     const usage = readUserUsage(userSnap.data(), now, deviceSnap?.data());
     const recorded = gachaSnap?.data()?.categories as string[] | undefined;
 
@@ -468,6 +471,8 @@ export async function reserveUsage(
             now.getTime(),
           ),
         },
+        // 紹介文の後追い生成のために残した場所(別カテゴリの取得で消さない)。
+        describe: existing?.describe ?? {},
         charged: charges.length > 0,
         updatedAt: now,
         expiresAt: new Date(now.getTime() + GACHA_USAGE_TTL_DAYS * 24 * 60 * 60 * 1000),
@@ -516,6 +521,83 @@ export async function markCategorySucceeded(
   } catch (e) {
     console.warn("取得の成功を記録できませんでした", e);
   }
+}
+
+/** 紹介文の後追い生成に使う、場所の実データ */
+export interface PlaceForDescription {
+  id: string;
+  name: string;
+  address?: string;
+  categoryName?: string;
+  budget?: string;
+}
+
+/** 1回の取得につき、紹介文を生成できる回数(最初の1回と、失敗時の取り直し) */
+export const MAX_DESCRIBE_TRIES = 3;
+
+/**
+ * 一覧に出した場所を、紹介文の後追い生成のために残す。取り直し(同じカテゴリの再取得)
+ * のときは、生成回数を数え直す。記録(ガチャの利用枠)がないとき、失敗したときは、何も
+ * しない(紹介文が付かないだけで、一覧は出せる)。
+ */
+export async function savePlacesForDescription(
+  uid: string,
+  gachaId: string | undefined,
+  category: string,
+  stationName: string,
+  places: PlaceForDescription[],
+): Promise<void> {
+  if (!gachaId) return;
+  try {
+    const ref = getFirestore()
+      .collection("users")
+      .doc(uid)
+      .collection("gachaUsage")
+      .doc(gachaId);
+    // undefinedの項目はFirestoreに書けないため、値のあるものだけを残す。
+    const clean = places.map((p) =>
+      Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)),
+    );
+    await ref.update({ [`describe.${category}`]: { places: clean, stationName, tries: 0 } });
+  } catch (e) {
+    console.warn("紹介文の元になる場所を保存できませんでした", e);
+  }
+}
+
+/**
+ * 紹介文の生成を1回分使い、その元になる場所を返す。保存した場所がないとき、上限を
+ * 超えるときは、HttpsErrorを投げる(AIを無制限に呼ばれないようにするため)。
+ */
+export async function takeDescribeTry(
+  uid: string,
+  gachaId: string,
+  category: string,
+  now: Date = new Date(),
+): Promise<{ places: PlaceForDescription[]; stationName: string }> {
+  const db = getFirestore();
+  const ref = db
+    .collection("users")
+    .doc(uid)
+    .collection("gachaUsage")
+    .doc(gachaId);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const entry = snap.data()?.describe?.[category] as
+      | { places?: PlaceForDescription[]; stationName?: string; tries?: number }
+      | undefined;
+    if (!entry?.places || entry.places.length === 0) {
+      throw new HttpsError("failed-precondition", "先に候補を取得してください");
+    }
+    const tries = entry.tries ?? 0;
+    if (tries >= MAX_DESCRIBE_TRIES) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "AIの紹介文の取得回数の上限に達しました。もう一度ガチャを引いてください",
+      );
+    }
+    tx.update(ref, { [`describe.${category}.tries`]: tries + 1, updatedAt: now });
+    return { places: entry.places, stationName: entry.stationName ?? "" };
+  });
 }
 
 /**
