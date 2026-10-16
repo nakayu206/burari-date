@@ -5,10 +5,10 @@ import 'package:burari_date/data/datasources/cloud/app_check_setup.dart';
 
 void main() {
   group('appCheckProviderKindFor', () {
-    test('本番のリリースビルドだけ、Play Integrityを使う', () {
+    test('本番のリリースビルドだけ、本番向けの証明(Android: Play Integrity)を使う', () {
       expect(
         appCheckProviderKindFor(Flavor.prod, isDebugBuild: false),
-        AppCheckProviderKind.playIntegrity,
+        AppCheckProviderKind.production,
       );
     });
 
@@ -19,7 +19,7 @@ void main() {
       );
     });
 
-    test('dev・stgは、Play以外から入れるため、リリースビルドでも、デバッグ用を使う', () {
+    test('dev・stgは、ストア以外から入れるため、リリースビルドでも、デバッグ用を使う', () {
       for (final flavor in [Flavor.dev, Flavor.stg]) {
         expect(
           appCheckProviderKindFor(flavor, isDebugBuild: false),
