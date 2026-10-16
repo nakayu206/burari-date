@@ -6,6 +6,7 @@ import 'core/config/flavor.dart';
 import 'core/constants/app_colors.dart';
 import 'presentation/pages/consent/consent_gate.dart';
 import 'presentation/pages/home/home_page.dart';
+import 'presentation/widgets/update_prompt_gate.dart';
 
 /// アプリのルートWidget。
 class BurariDateApp extends ConsumerWidget {
@@ -17,7 +18,8 @@ class BurariDateApp extends ConsumerWidget {
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      home: const ConsentGate(child: HomePage()),
+      // 同意のあとに、新しいバージョンがあれば、案内する(Issue #224)。
+      home: const ConsentGate(child: UpdatePromptGate(child: HomePage())),
     );
   }
 
