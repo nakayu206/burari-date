@@ -165,7 +165,9 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
         // 周辺に施設がなく、候補が0件のときは、空のリストではなく、案内を出す。
         if (candidates.isEmpty) return const _NoCandidatesView();
         // 店舗情報を先に出し、AIの紹介文は届いたものから差し替える。
-        final descriptionsAsync = ref.watch(candidateDescriptionsProvider(args));
+        final descriptionsAsync = ref.watch(
+          candidateDescriptionsProvider(args),
+        );
         final descriptions = descriptionsAsync.asData?.value;
         final shown = descriptions == null
             ? candidates

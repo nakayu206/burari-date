@@ -414,24 +414,20 @@ void main() {
         },
       );
 
-      final result = await repository.describeCandidates(
-        arrival,
-        CandidateCategory.gourmet,
-        const [
-          Candidate(
-            id: 'c1',
-            category: CandidateCategory.gourmet,
-            name: 'テスト食堂',
-            catchCopy: '仮',
-            reason: '仮',
-            walkMinutes: 3,
-            address: '東京都',
-            latitude: 35.0,
-            longitude: 139.0,
-          ),
-        ],
-        gachaId: 'g1',
-      );
+      final result = await repository
+          .describeCandidates(arrival, CandidateCategory.gourmet, const [
+            Candidate(
+              id: 'c1',
+              category: CandidateCategory.gourmet,
+              name: 'テスト食堂',
+              catchCopy: '仮',
+              reason: '仮',
+              walkMinutes: 3,
+              address: '東京都',
+              latitude: 35.0,
+              longitude: 139.0,
+            ),
+          ], gachaId: 'g1');
 
       expect(sent!['gachaId'], 'g1');
       expect(sent!.containsKey('places'), isFalse);
