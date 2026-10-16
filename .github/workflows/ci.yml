@@ -65,3 +65,46 @@ jobs:
       - name: Build and test functions
         working-directory: functions
         run: npm test
+
+  # 利用枠の確保・返却(Firestoreのトランザクション)を、エミュレータで、実際の書き込みまで
+  # 確かめる(Issue #189)。エミュレータのダウンロードと起動に時間がかかるため、別のジョブにして、
+  # アプリのテストと並べて実行する。
+  functions-emulator-test:
+    name: Functions emulator test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      # Firestoreエミュレータは、Java 21以上が必要。
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15
+
+      # ダウンロードしたエミュレータを、次回以降に使い回す。
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-15
+
+      - name: Test with Firestore emulator
+        working-directory: functions
+        run: npm run test:emulator
