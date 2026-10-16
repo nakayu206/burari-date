@@ -43,6 +43,15 @@ class _CandidateListPageState extends ConsumerState<CandidateListPage>
 
   @override
   Widget build(BuildContext context) {
+    // TabBarViewは表示中のタブしか作らないため、そのままだと観光タブは開いてから
+    // 取得を始めて待たされる。一覧を開いた時点で、両方を同時に取得し始める。
+    // 同じガチャのグルメ・観光は、無料枠で1回と数えるため、先読みで消費は増えない。
+    // listenは、再描画を起こさず、取得中の候補を破棄させない。
+    for (final category in CandidateCategory.values) {
+      final args = (result: widget.result, category: category);
+      ref.listen(candidatesProvider(args), (_, _) {});
+      ref.listen(candidateDescriptionsProvider(args), (_, _) {});
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('おでかけスポット'),
@@ -155,12 +164,29 @@ class _CandidateListTabState extends ConsumerState<_CandidateListTab>
       data: (candidates) {
         // 周辺に施設がなく、候補が0件のときは、空のリストではなく、案内を出す。
         if (candidates.isEmpty) return const _NoCandidatesView();
+        // 店舗情報を先に出し、AIの紹介文は届いたものから差し替える。
+        final descriptionsAsync = ref.watch(candidateDescriptionsProvider(args));
+        final descriptions = descriptionsAsync.asData?.value;
+        final shown = descriptions == null
+            ? candidates
+            : [
+                for (final c in candidates)
+                  descriptions[c.id] == null
+                      ? c
+                      : c.withDescription(descriptions[c.id]!),
+              ];
+        final descriptionFailed = descriptionsAsync.hasError;
         return Column(
           children: [
             Expanded(
               child: _CandidateListView(
-                candidates: candidates,
+                candidates: shown,
                 arrivalStation: result.arrivalStation,
+                result: result,
+                descriptionLoading: descriptionsAsync.isLoading,
+                onRetryDescriptions: descriptionFailed
+                    ? () => ref.invalidate(candidateDescriptionsProvider(args))
+                    : null,
               ),
             ),
             if (category == CandidateCategory.gourmet) const _HotPepperCredit(),
@@ -222,28 +248,81 @@ class _HotPepperCredit extends StatelessWidget {
   }
 }
 
+/// 詳細画面。AIの紹介文が、開いたあとに届いても、差し替わるようにする
+/// (紹介文が付く前に開くと、お気に入りに仮の説明が保存されてしまうため)。
+class _LiveCandidateDetail extends ConsumerWidget {
+  const _LiveCandidateDetail({
+    required this.result,
+    required this.candidate,
+    required this.fallbackStation,
+  });
+
+  final GachaResult result;
+  final Candidate candidate;
+  final Station fallbackStation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final description = ref
+        .watch(
+          candidateDescriptionsProvider((
+            result: result,
+            category: candidate.category,
+          )),
+        )
+        .asData
+        ?.value[candidate.id];
+    return CandidateDetailPage(
+      candidate: description == null
+          ? candidate
+          : candidate.withDescription(description),
+      fallbackStation: fallbackStation,
+    );
+  }
+}
+
 class _CandidateListView extends StatelessWidget {
   const _CandidateListView({
     required this.candidates,
     required this.arrivalStation,
+    required this.result,
+    this.descriptionLoading = false,
+    this.onRetryDescriptions,
   });
 
   final List<Candidate> candidates;
   final Station arrivalStation;
+  final GachaResult result;
+
+  /// AIの紹介文を作っている間。紹介文のない候補に、作成中の表示を出す。
+  final bool descriptionLoading;
+
+  /// 紹介文を取得できなかったときの、取り直し。nullなら、取り直しを出さない。
+  final VoidCallback? onRetryDescriptions;
 
   @override
   Widget build(BuildContext context) {
+    final retry = onRetryDescriptions;
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      itemCount: candidates.length,
+      itemCount: candidates.length + (retry == null ? 0 : 1),
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.lg),
       itemBuilder: (context, index) {
+        if (index == candidates.length) {
+          return Center(
+            child: TextButton(
+              onPressed: retry,
+              child: const Text('AIの紹介文を取得し直す'),
+            ),
+          );
+        }
         final candidate = candidates[index];
         return InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CandidateDetailPage(
+              builder: (_) => _LiveCandidateDetail(
+                result: result,
                 candidate: candidate,
                 fallbackStation: arrivalStation,
               ),
@@ -289,10 +368,13 @@ class _CandidateListView extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       // キャッチコピーは、AIが作った文章。店舗情報と区別する。
-                      const AiLabel(),
+                      // 紹介文が付く前の仮の表示には、AIの印を付けない。
+                      if (candidate.isAiGenerated) const AiLabel(),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        candidate.catchCopy,
+                        !candidate.isAiGenerated && descriptionLoading
+                            ? 'AIが紹介文を作っています…'
+                            : candidate.catchCopy,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: AppFontSizes.labelSmall,
